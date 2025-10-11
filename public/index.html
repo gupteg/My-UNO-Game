@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UNO Game</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="join-screen">
+        <h1>UNO Online</h1>
+        <input type="text" id="player-name-input" placeholder="Enter your name">
+        <button id="join-game-btn">Join Game</button>
+    </div>
+
+    <div id="lobby-screen" style="display: none;">
+        <h2>Game Lobby</h2>
+        <h3>Players:</h3>
+        <ul id="player-list"></ul>
+        <button id="start-game-btn">Start Game</button>
+        <p id="host-message" style="display: none;">(Waiting for the host to start the game)</p>
+    </div>
+
+    <div id="game-board" style="display: none;">
+        <div id="action-bar">Waiting for game to start...</div>
+
+        <div id="invalid-move-callout">Invalid Move!</div>
+        <div id="toast-notification"></div>
+        <div id="left-column"></div>
+        <div id="right-column">
+            <div id="piles-area"></div>
+            <div class="action-buttons">
+                <button id="drawCardBtn">DRAW CARD</button>
+                <button id="unoBtn">UNO</button>
+                <button id="arrangeHandBtn">Arrange My Hand</button>
+                <button id="endGameBtn" style="display: none;">END GAME</button>
+            </div>
+            <div id="game-log-container">
+                <h4>Game Log</h4>
+                <ul id="game-log-list"></ul>
+            </div>
+        </div>
+    </div>
+
+    <div id="uno-announcement-overlay"><div id="uno-announcement-text">UNO!</div></div>
+    <div id="end-of-round-div" class="modal" style="display: none;"><div class="modal-content"><h2 id="winner-message"></h2><div id="scores-display"></div><div class="modal-buttons-container" id="host-round-end-controls" style="display: none;"><button id="next-round-btn">Start Next Round</button><button id="end-game-round-btn">End Game</button></div><button id="next-round-ok-btn" style="display: none;">OK</button></div></div>
+    <div id="color-picker-modal" class="modal" style="display: none;"><div class="modal-content"><h3>Choose the next color:</h3><div class="color-options"><button class="color-btn" data-color="Red"></button><button class="color-btn" data-color="Green"></button><button class="color-btn" data-color="Blue"></button><button class="color-btn" data-color="Yellow"></button></div></div></div>
+    <div id="pick-until-modal" class="modal" style="display: none;"><div class="modal-content"><h3>Choose an action for Wild Pick Until:</h3><div class="action-options"><button id="option-pick-color">Next player picks until color</button><button id="option-discard-wilds">All players discard Wilds</button></div></div></div>
+    <div id="swap-modal" class="modal" style="display: none;"><div id="swap-modal-content" class="modal-content"><h3>Choose a player to swap hands with:</h3><div id="swap-player-options" class="action-options"></div></div></div>
+    <div id="drawn-wild-modal" class="modal" style="display: none;"><div class="modal-content"><h3>You drew a playable Wild card!</h3><div class="action-options"><button id="option-play-wild">Play Card</button><button id="option-keep-wild">Keep Card & Pass Turn</button></div></div></div>
+    <div id="deal-choice-modal" class="modal" style="display: none;"><div class="modal-content"><h3>You are the dealer!</h3><p>Choose how many cards to deal for this round:</p><input type="number" id="deal-cards-input" value="7" min="1" max="13"><button id="deal-cards-btn">Deal Cards</button></div></div>
+
+    <div id="confirm-end-game-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3>End Game</h3>
+            <p>Do you want to end this game?</p>
+            <div class="modal-buttons-container">
+                <button id="confirm-end-yes-btn">Yes</button>
+                <button id="confirm-end-no-btn">No</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="final-score-modal" class="modal" style="display: none;">
+        <div class="modal-content wide">
+            <h2 id="final-winner-message"></h2>
+            <div id="final-score-table-container"></div>
+            <div class="modal-buttons-container">
+                <button id="final-score-ok-btn">OK</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="game.js"></script>
+
+</body>
+</html>
