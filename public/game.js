@@ -927,12 +927,12 @@ window.addEventListener('DOMContentLoaded', () => {
                 cardContainer.addEventListener('dragover', e => {
                     e.preventDefault();
                     if (gameState.isSuspended || gameState.roundOver) return;
-                    const afterElement = getDragAfterElement(container, e.clientX);
+                    const afterElement = getDragAfterElement(cardContainer, e.clientX);
                     if (draggedCardElement) {
                         if (afterElement == null) {
-                            container.appendChild(draggedCardElement);
+                            cardContainer.appendChild(draggedCardElement);
                         } else {
-                            container.insertBefore(draggedCardElement, afterElement);
+                            cardContainer.insertBefore(draggedCardElement, afterElement);
                         }
                     }
                 });
