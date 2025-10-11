@@ -1,5 +1,5 @@
 window.addEventListener('DOMContentLoaded', () => {
-    const socket = io();
+    const socket = io('https://gupte-family-uno-game.onrender.com');
 
     let myPersistentPlayerId = sessionStorage.getItem('unoPlayerId');
     let isGameOver = false;
