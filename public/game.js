@@ -904,6 +904,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
                 cardContainer.addEventListener('dragend', e => {
                     if (e.target.classList.contains('card')) {
+                    e.target.classList.remove('dragging'); // <-- ADD THIS
                        setTimeout(() => {
                             e.target.style.opacity = '1';
                             const myCurrentPlayerState = window.gameState.players.find(p => p.playerId === myPersistentPlayerId);
