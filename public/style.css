@@ -663,7 +663,6 @@ body {
 }
 
 #next-round-btn, #confirm-end-yes-btn, #final-score-ok-btn, #next-round-ok-btn, #im-back-btn, #discard-pile-ok-btn, #confirm-afk-yes-btn,
-/* *** NEW: Added OK button style *** */
 #discard-wilds-ok-btn {
     background-color: #55aa55;
     border-color: #448844;
@@ -687,13 +686,17 @@ body {
     font-weight: bold;
 }
 
+/* *** MODIFIED: Toast Notification Styles *** */
 #toast-notification {
   position: absolute;
-  top: 20px;
+  /* Changed from top to bottom */
+  bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
-  padding: 12px 24px;
-  background-color: rgba(0,0,0,0.8);
+  /* Increased padding */
+  padding: 15px 30px;
+  /* Darker background */
+  background-color: rgba(0,0,0,0.9);
   color: #ffc107;
   font-weight: bold;
   border-radius: 25px;
@@ -702,12 +705,14 @@ body {
   opacity: 0;
   transition: all 0.5s ease-in-out;
   pointer-events: none;
-  font-size: 1.1em;
+  /* Increased font size */
+  font-size: 1.2em;
 }
 
 #toast-notification.show {
     opacity: 1;
-    transform: translate(-50%, 10px);
+    /* Adjusted transform for bottom positioning */
+    transform: translate(-50%, -10px);
 }
 
 .player-area.disconnected {
@@ -881,6 +886,18 @@ body {
     .card-container {
         min-height: 95px;
     }
+
+    /* Adjust toast further for mobile if needed, e.g., ensure it's above buttons */
+    #toast-notification {
+         /* Maybe slightly smaller padding on mobile */
+        padding: 12px 20px;
+        font-size: 1.1em;
+        /* Ensure it's definitely above the action buttons */
+        /* The body padding-bottom should handle this, but adding a specific bottom value can be safer */
+         bottom: 180px; /* Adjust if button bar height changes */
+         max-width: 90%; /* Prevent it from touching edges */
+    }
+
 }
 
 /* *** NEW: Styles for Discard Wilds Modal *** */
