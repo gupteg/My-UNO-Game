@@ -689,13 +689,10 @@ body {
 /* *** MODIFIED: Toast Notification Styles *** */
 #toast-notification {
   position: absolute;
-  /* Changed from top to bottom */
   bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
-  /* Increased padding */
   padding: 15px 30px;
-  /* Darker background */
   background-color: rgba(0,0,0,0.9);
   color: #ffc107;
   font-weight: bold;
@@ -705,13 +702,12 @@ body {
   opacity: 0;
   transition: all 0.5s ease-in-out;
   pointer-events: none;
-  /* Increased font size */
-  font-size: 1.2em;
+  /* Font size 3x */
+  font-size: 3.6em; /* <--- MODIFIED */
 }
 
 #toast-notification.show {
     opacity: 1;
-    /* Adjusted transform for bottom positioning */
     transform: translate(-50%, -10px);
 }
 
@@ -887,15 +883,12 @@ body {
         min-height: 95px;
     }
 
-    /* Adjust toast further for mobile if needed, e.g., ensure it's above buttons */
     #toast-notification {
-         /* Maybe slightly smaller padding on mobile */
-        padding: 12px 20px;
-        font-size: 1.1em;
-        /* Ensure it's definitely above the action buttons */
-        /* The body padding-bottom should handle this, but adding a specific bottom value can be safer */
-         bottom: 180px; /* Adjust if button bar height changes */
-         max-width: 90%; /* Prevent it from touching edges */
+         padding: 12px 20px;
+         /* Font size 2x */
+         font-size: 2.2em; /* <--- MODIFIED */
+         bottom: 180px;
+         max-width: 90%;
     }
 
 }
