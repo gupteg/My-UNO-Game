@@ -276,7 +276,18 @@ window.addEventListener('DOMContentLoaded', () => {
         console.log('Socket connected with ID:', socket.id);
         if (myPersistentPlayerId) {
             console.log('Attempting to rejoin with existing ID:', myPersistentPlayerId);
-            const playerName = playerNameInput.value.trim() || "Player";
+            
+            // --- MODIFIED LOGIC (FIX) ---
+            // Get the name from session storage.
+            const savedName = sessionStorage.getItem('unoPlayerName');
+            const playerName = savedName || playerNameInput.value.trim() || "Player";
+            
+            // Pre-fill the input box with the saved name for consistency
+            if (savedName) {
+                playerNameInput.value = savedName;
+            }
+            // --- END OF MODIFIED LOGIC ---
+
             socket.emit('joinGame', { playerName, playerId: myPersistentPlayerId });
         }
     });
@@ -285,6 +296,16 @@ window.addEventListener('DOMContentLoaded', () => {
         console.log('Successfully joined/registered with ID:', playerId);
         myPersistentPlayerId = playerId;
         sessionStorage.setItem('unoPlayerId', playerId);
+
+        // --- NEW LOGIC (FIX) ---
+        // Find our own player object in the lobby list to get the confirmed name
+        const me = lobby.find(p => p.playerId === playerId);
+        if (me) {
+            sessionStorage.setItem('unoPlayerName', me.name);
+            // Also, update the input box in case the user is sitting on the join screen
+            playerNameInput.value = me.name;
+        }
+        // --- END OF NEW LOGIC ---
 
         renderLobby(lobby);
     });
