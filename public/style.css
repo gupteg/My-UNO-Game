@@ -677,13 +677,30 @@ body {
     border-color: #666 !important;
     box-shadow: none !important;
 }
-.player-area.disconnected .player-info::after {
+
+/* <-- START PHASE 1 CHANGE: New 'Removed' styles --> */
+.player-area.disconnected:not(.removed) .player-info::after {
     content: '(Disconnected)';
     font-style: italic;
     font-weight: normal;
     color: #ffdddd;
     margin-left: 10px;
 }
+
+.player-area.removed .player-info::after {
+    content: '(Removed)';
+    font-style: italic;
+    font-weight: normal;
+    color: #aaa;
+    margin-left: 10px;
+}
+
+.player-area.removed {
+    opacity: 0.4;
+    border-style: dashed;
+}
+/* <-- END PHASE 1 CHANGE --> */
+
 
 /* Responsive Layout for Mobile Devices */
 @media (max-width: 768px) {

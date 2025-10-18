@@ -641,9 +641,9 @@ window.addEventListener('DOMContentLoaded', () => {
         if (actionBar) {
             if (gameSuspended && gameState.suspensionInfo) {
                 const { disconnectTime } = gameState.suspensionInfo;
-                // NEW: Find all disconnected players
+                // <-- PHASE 1 CHANGE: Filter by 'Disconnected' status
                 const disconnectedNames = gameState.players
-                    .filter(p => !p.isConnected)
+                    .filter(p => p.status === 'Disconnected')
                     .map(p => p.name)
                     .join(', ');
 
@@ -659,7 +659,8 @@ window.addEventListener('DOMContentLoaded', () => {
             } else if (gameState.roundOver) {
                 const host = gameState.players.find(p => p.isHost);
                 const hostIsReady = gameState.readyForNextRound.includes(host?.playerId);
-                const connectedPlayers = gameState.players.filter(p => p.isConnected);
+                // <-- PHASE 1 CHANGE: Filter by 'Active'
+                const connectedPlayers = gameState.players.filter(p => p.status === 'Active');
                 const allReady = gameState.readyForNextRound.length === connectedPlayers.length;
 
                 if (hostIsReady && !allReady) {
@@ -678,7 +679,8 @@ window.addEventListener('DOMContentLoaded', () => {
                 actionBar.textContent = chooser ? `${chooser.name} is choosing a color...` : 'Choosing a color...';
             } else if (gameState.currentPlayerIndex !== undefined && gameState.players[gameState.currentPlayerIndex]) {
                 const currentPlayer = gameState.players[gameState.currentPlayerIndex];
-                if (currentPlayer.isConnected) {
+                // <-- PHASE 1 CHANGE: Check status
+                if (currentPlayer.status === 'Active') {
                     actionBar.textContent = `Waiting for ${currentPlayer.name} to play...`;
                 } else {
                     actionBar.textContent = `Waiting for ${currentPlayer.name} to reconnect...`;
@@ -739,7 +741,8 @@ window.addEventListener('DOMContentLoaded', () => {
             const swapOptions = document.getElementById('swap-player-options');
             swapOptions.innerHTML = '';
             gameState.players.forEach(player => {
-                if (player.playerId !== myPersistentPlayerId && player.isConnected) {
+                // <-- PHASE 1 CHANGE: Check status
+                if (player.playerId !== myPersistentPlayerId && player.status === 'Active') {
                     const button = document.createElement('button');
                     button.textContent = player.name;
                     button.className = 'player-swap-btn';
@@ -832,13 +835,18 @@ window.addEventListener('DOMContentLoaded', () => {
             playerArea.className = 'player-area';
             playerArea.dataset.playerId = player.playerId;
 
-            if (!player.isConnected) {
+            // <-- START PHASE 1 CHANGE: New status rendering
+            if (player.status === 'Disconnected') {
                 playerArea.classList.add('disconnected');
+            } else if (player.status === 'Removed') {
+                playerArea.classList.add('disconnected', 'removed');
             }
+            // <-- END PHASE 1 CHANGE
 
             const isCurrentPlayer = playerIndex === gameState.currentPlayerIndex;
             const isDealerChoosing = player.playerId === gameState.needsDealChoice;
-            if ((isCurrentPlayer && player.isConnected && !gameState.isSuspended && !gameState.roundOver) || isDealerChoosing) {
+            // <-- PHASE 1 CHANGE: Check status
+            if ((isCurrentPlayer && player.status === 'Active' && !gameState.isSuspended && !gameState.roundOver) || isDealerChoosing) {
                 playerArea.classList.add('active-player');
             }
 
@@ -872,12 +880,14 @@ window.addEventListener('DOMContentLoaded', () => {
                     const cardEl = createCardElement(card, originalCardIndex);
 
                     const isMyTurn = playerIndex === gameState.currentPlayerIndex;
-                    if (isMyTurn && !gameState.isSuspended && !gameState.roundOver && player.isConnected) {
+                    // <-- PHASE 1 CHANGE: Check status
+                    if (isMyTurn && !gameState.isSuspended && !gameState.roundOver && player.status === 'Active') {
                         cardEl.classList.add('clickable');
                     }
 
                     cardEl.addEventListener('click', () => {
-                        if (isMyTurn && !gameState.isSuspended && !gameState.roundOver && player.isConnected) {
+                        // <-- PHASE 1 CHANGE: Check status
+                        if (isMyTurn && !gameState.isSuspended && !gameState.roundOver && player.status === 'Active') {
                             if (isClientMoveValid(card, gameState)) {
                                 socket.emit('playCard', { cardIndex: originalCardIndex });
                             } else {
@@ -939,7 +949,8 @@ window.addEventListener('DOMContentLoaded', () => {
                 });
 
             } else { 
-                if (gameState.roundOver && player.isConnected) {
+                // <-- PHASE 1 CHANGE: Check status
+                if (gameState.roundOver && player.status === 'Active') {
                     player.hand.forEach((card, cardIndex) => {
                         const cardEl = createCardElement(card, cardIndex);
                         cardContainer.appendChild(cardEl);
