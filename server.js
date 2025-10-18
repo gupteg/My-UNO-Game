@@ -790,13 +790,25 @@ io.on('connection', (socket) => {
       const originalPlayerIndex = gameState.players.findIndex(p => p.socketId === socket.id);
 
       if (choice === 'discard-wilds') {
-          addLog(`🌪️ Everyone else discards their Wild cards!`);
+          addLog(`🌪️ ${player.name} chose 'All players discard Wilds'!`);
           const winners = [];
+          // *** NEW: Array to collect data for the modal ***
+          const allDiscardedData = [];
+
           gameState.players.forEach(p => {
               if (p.socketId !== socket.id) {
                   const originalHandSize = p.hand.length;
                   if (originalHandSize > 0) {
+                      
+                      // *** NEW: Find out which cards are being discarded ***
+                      const discardedCards = p.hand.filter(card => card.color === 'Black');
+                      if (discardedCards.length > 0) {
+                        allDiscardedData.push({ playerName: p.name, cards: discardedCards });
+                      }
+
+                      // *** This line is the original logic ***
                       p.hand = p.hand.filter(card => card.color !== 'Black');
+
                       if (p.hand.length === 0) {
                           winners.push(p);
                       }
@@ -807,6 +819,13 @@ io.on('connection', (socket) => {
                   }
               }
           });
+
+          // *** NEW: Emit the event for the modal ***
+          if (allDiscardedData.length > 0) {
+            io.emit('showDiscardWildsModal', allDiscardedData);
+          } else {
+            addLog('...but no other players had any Wild cards.');
+          }
 
           if (winners.length > 0) {
               const heldWinners = gameState.players.filter(p => gameState.winnerOnHold.includes(p.playerId));
@@ -822,6 +841,9 @@ io.on('connection', (socket) => {
           gameState.needsColorChoice = player.playerId;
 
       } else if (choice === 'pick-color') {
+          // *** NEW: Log the choice ***
+          addLog(`🎨 ${player.name} chose 'Next player picks until color'.`);
+          
           let nextPlayerIndex = (originalPlayerIndex + gameState.playDirection + numPlayers) % numPlayers;
           let searchLimit = numPlayers; 
           while (gameState.players[nextPlayerIndex].status !== 'Active' && searchLimit > 0) {
@@ -877,6 +899,7 @@ io.on('connection', (socket) => {
         gameState.activeColor = color;
         gameState.currentPlayerIndex = gameState.pickUntilState.targetPlayerIndex;
         const targetPlayer = gameState.players[gameState.pickUntilState.targetPlayerIndex];
+        // *** This log is now the consequence, which is perfect ***
         addLog(`› ${targetPlayer.name} must now pick until they find a ${color} card!`);
     } else {
         gameState.activeColor = color;
