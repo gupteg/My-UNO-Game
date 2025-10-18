@@ -790,9 +790,10 @@ io.on('connection', (socket) => {
       const originalPlayerIndex = gameState.players.findIndex(p => p.socketId === socket.id);
 
       if (choice === 'discard-wilds') {
-          addLog(`🌪️ ${player.name} chose 'All players discard Wilds'!`);
+          const msg = `🌪️ ${player.name} chose 'All players discard Wilds'!`;
+          addLog(msg);
+          io.emit('announce', msg); // *** NEW: Global Toast Announcement ***
           const winners = [];
-          // *** NEW: Array to collect data for the modal ***
           const allDiscardedData = [];
 
           gameState.players.forEach(p => {
@@ -800,13 +801,11 @@ io.on('connection', (socket) => {
                   const originalHandSize = p.hand.length;
                   if (originalHandSize > 0) {
                       
-                      // *** NEW: Find out which cards are being discarded ***
                       const discardedCards = p.hand.filter(card => card.color === 'Black');
                       if (discardedCards.length > 0) {
                         allDiscardedData.push({ playerName: p.name, cards: discardedCards });
                       }
 
-                      // *** This line is the original logic ***
                       p.hand = p.hand.filter(card => card.color !== 'Black');
 
                       if (p.hand.length === 0) {
@@ -820,7 +819,6 @@ io.on('connection', (socket) => {
               }
           });
 
-          // *** NEW: Emit the event for the modal ***
           if (allDiscardedData.length > 0) {
             io.emit('showDiscardWildsModal', allDiscardedData);
           } else {
@@ -841,8 +839,9 @@ io.on('connection', (socket) => {
           gameState.needsColorChoice = player.playerId;
 
       } else if (choice === 'pick-color') {
-          // *** NEW: Log the choice ***
-          addLog(`🎨 ${player.name} chose 'Next player picks until color'.`);
+          const msg = `🎨 ${player.name} chose 'Next player picks until color'.`;
+          addLog(msg);
+          io.emit('announce', msg); // *** NEW: Global Toast Announcement ***
           
           let nextPlayerIndex = (originalPlayerIndex + gameState.playDirection + numPlayers) % numPlayers;
           let searchLimit = numPlayers; 
@@ -875,7 +874,10 @@ io.on('connection', (socket) => {
     if (choosingPlayer && targetPlayer) {
         io.emit('animateSwap', { p1_id: choosingPlayer.playerId, p2_id: targetPlayer.playerId });
         [choosingPlayer.hand, targetPlayer.hand] = [targetPlayer.hand, choosingPlayer.hand];
-        addLog(`🤝 ${choosingPlayer.name} swapped hands with ${targetPlayer.name}!`);
+        
+        const msg = `🤝 ${choosingPlayer.name} swapped hands with ${targetPlayer.name} and chose ${gameState.activeColor}!`;
+        addLog(msg);
+        io.emit('announce', msg); // *** NEW: Global Toast Announcement ***
     }
     gameState.needsSwapChoice = null;
     gameState.swapState = null;
@@ -899,11 +901,22 @@ io.on('connection', (socket) => {
         gameState.activeColor = color;
         gameState.currentPlayerIndex = gameState.pickUntilState.targetPlayerIndex;
         const targetPlayer = gameState.players[gameState.pickUntilState.targetPlayerIndex];
-        // *** This log is now the consequence, which is perfect ***
-        addLog(`› ${targetPlayer.name} must now pick until they find a ${color} card!`);
+        
+        const msg = `› ${targetPlayer.name} must now pick until they find a ${color} card!`;
+        addLog(msg);
+        io.emit('announce', msg); // *** NEW: Global Toast Announcement ***
+
     } else {
         gameState.activeColor = color;
         const isDealerChoosingFirstCard = gameState.discardPile.length === 1 && gameState.players[gameState.dealerIndex].playerId === choosingPlayer.playerId;
+        
+        // *** NEW: Global Toast Announcement for Wild / Wild D4 ***
+        if (!isDealerChoosingFirstCard) {
+            const cardName = gameState.discardPile[0].card.value; // Gets "Wild" or "Wild Draw Four"
+            const msg = `✨ ${choosingPlayer.name} played ${cardName} and chose ${color}.`;
+            io.emit('announce', msg);
+        }
+
         if (!isDealerChoosingFirstCard) {
             advanceTurn();
         }
