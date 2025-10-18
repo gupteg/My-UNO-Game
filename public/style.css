@@ -688,8 +688,8 @@ body {
 
 /* *** MODIFIED: Toast Notification Styles *** */
 #toast-notification {
-  position: absolute;
-  bottom: 20px;
+  position: fixed; /* Use fixed for viewport positioning */
+  bottom: 150px; /* Raised position for desktop */
   left: 50%;
   transform: translateX(-50%);
   padding: 15px 30px;
@@ -702,14 +702,15 @@ body {
   opacity: 0;
   transition: all 0.5s ease-in-out;
   pointer-events: none;
-  /* Font size 3x */
-  font-size: 3.6em; /* <--- MODIFIED */
+  font-size: 3.6em; /* 3x size for desktop */
+  white-space: nowrap; /* Prevent wrapping on desktop */
 }
 
 #toast-notification.show {
     opacity: 1;
-    transform: translate(-50%, -10px);
+    transform: translate(-50%, 10px); /* Adjust upward movement */
 }
+
 
 .player-area.disconnected {
     opacity: 0.5;
@@ -885,10 +886,10 @@ body {
 
     #toast-notification {
          padding: 12px 20px;
-         /* Font size 2x */
-         font-size: 2.2em; /* <--- MODIFIED */
-         bottom: 180px;
+         font-size: 1.6em; /* ~1.75cm height, 2x previous mobile size */
+         bottom: 180px; /* Above fixed action buttons */
          max-width: 90%;
+         white-space: normal; /* Allow wrapping */
     }
 
 }
