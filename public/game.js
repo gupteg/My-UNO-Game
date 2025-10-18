@@ -1,10 +1,11 @@
 window.addEventListener('DOMContentLoaded', () => {
-    const socket = io('https.gupte-family-uno-game.onrender.com');
+    const socket = io('https://gupte-family-uno-game.onrender.com');
 
     let myPersistentPlayerId = sessionStorage.getItem('unoPlayerId');
     let isGameOver = false;
     let countdownInterval = null;
-    
+    const DISCONNECT_GRACE_PERIOD = 60000; // Match server setting
+
     let playerIdToKick = null;
     let playerIdToMarkAFK = null;
 
@@ -236,17 +237,15 @@ window.addEventListener('DOMContentLoaded', () => {
         if (isGameOver) return;
         renderLobby(players);
     });
-    
+
     socket.on('kicked', () => {
         alert('You have been kicked from the lobby by the host.');
-        sessionStorage.removeItem('unoPlayerId'); 
+        sessionStorage.removeItem('unoPlayerId');
         window.location.reload();
     });
-    
+
     socket.on('youWereMarkedAFK', () => {
-        // Show the AFK modal
         afkNotificationModal.style.display = 'flex';
-        // Hide all other modals just in case
         colorPickerModal.style.display = 'none';
         pickUntilModal.style.display = 'none';
         swapModal.style.display = 'none';
@@ -260,9 +259,11 @@ window.addEventListener('DOMContentLoaded', () => {
         if (gameState.roundOver) {
             displayGame(gameState);
         } else {
-            // --- START BUG FIX: REMOVED faulty line that hid the modal ---
-            // afkNotificationModal.style.display = 'none'; 
-            // --- END BUG FIX ---
+            // Only hide the AFK modal if the player is now 'Active' again
+            const myPlayer = gameState.players.find(p => p.playerId === myPersistentPlayerId);
+            if(myPlayer && myPlayer.status === 'Active') {
+                afkNotificationModal.style.display = 'none';
+            }
             joinScreen.style.display = 'none';
             lobbyScreen.style.display = 'none';
             endOfRoundDiv.style.display = 'none';
@@ -311,9 +312,7 @@ window.addEventListener('DOMContentLoaded', () => {
         isGameOver = true;
         gameBoard.style.display = 'none';
         endOfRoundDiv.style.display = 'none';
-        // --- START BUG FIX: Explicitly hide modal on game over ---
         afkNotificationModal.style.display = 'none';
-        // --- END BUG FIX ---
         renderFinalScores(finalGameState);
         finalScoreModal.style.display = 'flex';
     });
@@ -378,7 +377,7 @@ window.addEventListener('DOMContentLoaded', () => {
         players.forEach(player => {
             const playerItem = document.createElement('li');
             const playerNameSpan = document.createElement('span');
-            
+
             let content = player.name;
             if (player.isHost) { content += ' 👑 (Host)'; }
             if (player.playerId === myPersistentPlayerId) {
@@ -387,7 +386,7 @@ window.addEventListener('DOMContentLoaded', () => {
             }
             playerNameSpan.textContent = content;
             playerItem.appendChild(playerNameSpan);
-            
+
             if (amIHost && player.playerId !== myPersistentPlayerId) {
                 const kickBtn = document.createElement('button');
                 kickBtn.textContent = 'Kick';
@@ -448,8 +447,8 @@ window.addEventListener('DOMContentLoaded', () => {
         cardElement.classList.add('invalid-shake');
         const cardRect = cardElement.getBoundingClientRect();
         const boardRect = gameBoard.getBoundingClientRect();
-        invalidMoveCallout.style.top = `${cardRect.top - boardRect.top - 40}px`; 
-        invalidMoveCallout.style.left = `${cardRect.left - boardRect.left + (cardRect.width / 2) - (invalidMoveCallout.offsetWidth / 2)}px`; 
+        invalidMoveCallout.style.top = `${cardRect.top - boardRect.top - 40}px`;
+        invalidMoveCallout.style.left = `${cardRect.left - boardRect.left + (cardRect.width / 2) - (invalidMoveCallout.offsetWidth / 2)}px`;
         invalidMoveCallout.classList.add('show');
         setTimeout(() => {
             cardElement.classList.remove('invalid-shake');
@@ -507,7 +506,7 @@ window.addEventListener('DOMContentLoaded', () => {
         const startRect = drawPileEl.getBoundingClientRect();
         const endRect = playerAreaEl.getBoundingClientRect();
         const boardRect = gameBoard.getBoundingClientRect();
-        const smallCardWidth = 80; 
+        const smallCardWidth = 80;
         const scaleFactor = smallCardWidth / startRect.width;
 
         for (let i = 0; i < count; i++) {
@@ -703,7 +702,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
 
     function displayGame(gameState) {
-        window.gameState = gameState; 
+        window.gameState = gameState;
 
         if (countdownInterval) {
             clearInterval(countdownInterval);
@@ -941,7 +940,7 @@ window.addEventListener('DOMContentLoaded', () => {
             const hostIndicator = player.isHost ? '👑 ' : '';
             playerInfo.innerHTML = `${hostIndicator}${player.name} (${player.hand.length} cards) <span class="player-score">Score: ${player.score}</span>`;
             playerArea.appendChild(playerInfo);
-            
+
             if (myPlayer.isHost && player.playerId !== myPersistentPlayerId && player.status === 'Active' && !gameState.roundOver) {
                 const afkBtn = document.createElement('button');
                 afkBtn.textContent = 'AFK';
@@ -961,7 +960,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 const serverHand = window.gameState.players.find(p => p.playerId === myPersistentPlayerId).hand;
 
                 player.hand.forEach((card, clientIndex) => {
-                    const originalCardIndex = serverHand.findIndex((serverCard, serverIndex) => 
+                    const originalCardIndex = serverHand.findIndex((serverCard, serverIndex) =>
                         serverCard.color === card.color && serverCard.value === card.value && !Array.from(cardContainer.children).some(el => parseInt(el.dataset.cardIndex) === serverIndex)
                     );
 
@@ -1000,7 +999,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
                 cardContainer.addEventListener('dragend', e => {
                     if (e.target.classList.contains('card')) {
-                    e.target.classList.remove('dragging'); 
+                    e.target.classList.remove('dragging');
                        setTimeout(() => {
                             e.target.style.opacity = '1';
                             const myCurrentPlayerState = window.gameState.players.find(p => p.playerId === myPersistentPlayerId);
@@ -1034,7 +1033,7 @@ window.addEventListener('DOMContentLoaded', () => {
                     }
                 });
 
-            } else { 
+            } else {
                 if (gameState.roundOver && (player.status === 'Active' || player.status === 'Disconnected')) {
                     player.hand.forEach((card, cardIndex) => {
                         const cardEl = createCardElement(card, cardIndex);
@@ -1089,5 +1088,4 @@ window.addEventListener('DOMContentLoaded', () => {
     makeDraggable(document.getElementById('confirm-afk-modal'));
     makeDraggable(document.getElementById('afk-notification-modal'));
 
-});
-}
+}); // <-- REMOVED THE EXTRA '}' FROM HERE
