@@ -57,14 +57,11 @@ body {
   font-size: 1.1em;
   font-weight: bold;
   color: #444;
-  /* *** START: KICK BTN SUPPORT *** */
   display: flex;
   justify-content: space-between;
   align-items: center;
-  /* *** END: KICK BTN SUPPORT *** */
 }
 
-/* *** START: NEW KICK BTN STYLE *** */
 .kick-btn {
     padding: 4px 10px;
     font-size: 0.9em;
@@ -79,7 +76,6 @@ body {
 .kick-btn:hover {
     background-color: #cc4444;
 }
-/* *** END: NEW KICK BTN STYLE *** */
 
 
 #host-message {
@@ -92,7 +88,7 @@ body {
   height: 100%;
   display: flex;
   gap: 10px;
-  position: relative; 
+  position: relative;
   padding-top: 45px;
   box-sizing: border-box;
 }
@@ -156,14 +152,11 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  /* *** START: AFK BTN SUPPORT *** */
   display: flex;
   justify-content: space-between;
   align-items: center;
-  /* *** END: AFK BTN SUPPORT *** */
 }
 
-/* *** START: NEW AFK BTN STYLE *** */
 .mark-afk-btn {
     padding: 3px 8px;
     font-size: 0.8em;
@@ -179,7 +172,6 @@ body {
 .mark-afk-btn:hover {
     background-color: #e6a700;
 }
-/* *** END: NEW AFK BTN STYLE *** */
 
 
 .player-score {
@@ -199,7 +191,7 @@ body {
   flex-wrap: wrap;
   gap: 8px;
   min-height: 125px;
-  position: relative; 
+  position: relative;
 }
 
 .card {
@@ -374,7 +366,6 @@ body {
   justify-content: center;
   align-items: flex-start;
   padding-top: 10vh;
-  /* ADDED: Ensure clicks on the backdrop don't affect dragging */
   pointer-events: none;
 }
 
@@ -385,11 +376,9 @@ body {
   border-radius: 10px;
   text-align: center;
   max-width: 90%;
-  /* ADDED: Allow clicks inside the modal */
   pointer-events: auto;
 }
 
-/* ADDED: Make modal headers draggable */
 .modal-content h3, .modal-content h2, .modal-content p {
     cursor: move;
     user-select: none; /* Prevent text selection while dragging */
@@ -665,6 +654,7 @@ body {
     background-color: #f0f0f0;
     transition: all 0.2s ease;
     padding: 10px 20px;
+    cursor: pointer; /* Ensure buttons look clickable */
 }
 
 .modal-buttons-container button:hover, #next-round-ok-btn:hover {
@@ -672,13 +662,13 @@ body {
     box-shadow: 0 4px 8px rgba(0,0,0,0.3);
 }
 
-#next-round-btn, #confirm-end-yes-btn, #final-score-ok-btn, #next-round-ok-btn, #im-back-btn {
+#next-round-btn, #confirm-end-yes-btn, #final-score-ok-btn, #next-round-ok-btn, #im-back-btn, #discard-pile-ok-btn, #confirm-afk-yes-btn {
     background-color: #55aa55;
     border-color: #448844;
     color: white;
 }
 
-#end-game-round-btn, #confirm-end-no-btn {
+#end-game-round-btn, #confirm-end-no-btn, #confirm-afk-no-btn {
     background-color: #ff5555;
     border-color: #cc4444;
     color: white;
@@ -746,7 +736,6 @@ body {
     border-style: dashed;
 }
 
-/* *** NEW: Discard Pile Modal Styles *** */
 #discard-pile-list {
     max-height: 40vh;
     overflow-y: auto;
@@ -782,14 +771,14 @@ body {
     font-weight: bold;
     text-align: left;
 }
-/* *** END: Discard Pile Modal Styles *** */
 
 
 /* Responsive Layout for Mobile Devices */
 @media (max-width: 768px) {
     body {
         padding: 5px;
-        padding-bottom: 90px;
+        /* Increased padding for more scroll space below fixed buttons */
+        padding-bottom: 150px;
         overflow-y: auto;
         overflow-x: hidden;
     }
@@ -803,7 +792,7 @@ body {
         flex: 1;
         padding-right: 0;
         gap: 8px;
-        overflow-y: visible;
+        overflow-y: visible; /* Rely on body scroll */
     }
 
     #right-column {
@@ -813,8 +802,9 @@ body {
         align-items: center;
         gap: 15px;
         padding: 5px 0;
-        overflow-y: visible;
-        margin-bottom: 80px; /* NEW: Buffer for the fixed button bar */
+        overflow-y: visible; /* Rely on body scroll */
+        /* *** INCREASED MARGIN FOR LOG VISIBILITY *** */
+        margin-bottom: 120px; /* Increased buffer */
     }
 
     .player-area {
@@ -837,6 +827,7 @@ body {
         padding: 10px;
         box-sizing: border-box;
         gap: 10px;
+        z-index: 50; /* Ensure it's above other content */
     }
 
     #unoBtn {
@@ -850,17 +841,20 @@ body {
         font-size: 14px;
         padding: 10px;
         flex: 1 1 40%; /* Allow buttons to share space */
+        min-width: 100px; /* Ensure buttons don't get too small */
     }
     #drawCardBtn { order: 1; }
-    #arrangeHandBtn { 
+    #arrangeHandBtn {
         order: 3;
     }
-    #showDiscardPileBtn { order: 4; } /* *** NEW *** */
-    #endGameBtn { order: 5; } /* *** UPDATED *** */
+    #showDiscardPileBtn { order: 4; }
+    #endGameBtn { order: 5; }
 
 
     #game-log-container {
         width: 100%;
+        /* Add some padding so the last log isn't right at the bottom edge */
+        padding-bottom: 10px;
     }
 
     .card {

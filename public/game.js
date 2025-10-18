@@ -5,6 +5,7 @@ window.addEventListener('DOMContentLoaded', () => {
     let myPersistentPlayerId = sessionStorage.getItem('unoPlayerId');
     let isGameOver = false;
     let countdownInterval = null;
+    let playerIdToMarkAFK = null; // *** NEW: For AFK confirmation
 
     // --- SCREEN & ELEMENT REFERENCES ---
     const joinScreen = document.getElementById('join-screen');
@@ -49,10 +50,17 @@ window.addEventListener('DOMContentLoaded', () => {
     const afkNotificationModal = document.getElementById('afk-notification-modal');
     const imBackBtn = document.getElementById('im-back-btn');
 
-    // *** NEW: Discard Pile References ***
+    // *** Discard Pile References ***
     const showDiscardPileBtn = document.getElementById('showDiscardPileBtn');
     const discardPileModal = document.getElementById('discard-pile-modal');
     const discardPileList = document.getElementById('discard-pile-list');
+    const discardPileOkBtn = document.getElementById('discard-pile-ok-btn'); // *** NEW ***
+
+    // *** NEW: Confirm AFK Modal References ***
+    const confirmAfkModal = document.getElementById('confirm-afk-modal');
+    const confirmAfkPlayerName = document.getElementById('confirm-afk-player-name');
+    const confirmAfkYesBtn = document.getElementById('confirm-afk-yes-btn');
+    const confirmAfkNoBtn = document.getElementById('confirm-afk-no-btn');
 
 
     joinScreen.style.display = 'block';
@@ -82,13 +90,33 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // *** In-Game AFK Button Listener ***
+    // *** MODIFIED: In-Game AFK Button Listener (Shows Confirmation) ***
     document.getElementById('left-column').addEventListener('click', (event) => {
         if (event.target.classList.contains('mark-afk-btn')) {
-            const playerIdToMark = event.target.dataset.playerId;
-            socket.emit('markPlayerAFK', { playerIdToMark });
+            playerIdToMarkAFK = event.target.dataset.playerId; // Store the ID
+            // Find player name to show in modal
+            const player = window.gameState?.players.find(p => p.playerId === playerIdToMarkAFK);
+            if (player) {
+                confirmAfkPlayerName.textContent = player.name;
+                confirmAfkModal.style.display = 'flex';
+            }
         }
     });
+
+    // *** NEW: AFK Confirmation Listeners ***
+    confirmAfkYesBtn.addEventListener('click', () => {
+        if (playerIdToMarkAFK) {
+            socket.emit('markPlayerAFK', { playerIdToMark: playerIdToMarkAFK });
+        }
+        confirmAfkModal.style.display = 'none';
+        playerIdToMarkAFK = null; // Clear stored ID
+    });
+
+    confirmAfkNoBtn.addEventListener('click', () => {
+        confirmAfkModal.style.display = 'none';
+        playerIdToMarkAFK = null; // Clear stored ID
+    });
+
 
     // *** "I'm Back" Button Listener ***
     imBackBtn.addEventListener('click', () => {
@@ -114,7 +142,7 @@ window.addEventListener('DOMContentLoaded', () => {
         gameBoard.style.display = 'none';
         lobbyScreen.style.display = 'none';
         joinScreen.style.display = 'block';
-        sessionStorage.clear(); 
+        sessionStorage.clear();
         myPersistentPlayerId = null;
     });
 
@@ -204,7 +232,7 @@ window.addEventListener('DOMContentLoaded', () => {
         displayGame(window.gameState);
     });
 
-    // *** NEW: Discard Pile Modal Listener ***
+    // *** Discard Pile Modal Show Listener ***
     showDiscardPileBtn.addEventListener('click', () => {
         if (!window.gameState) return;
         
@@ -222,14 +250,23 @@ window.addEventListener('DOMContentLoaded', () => {
                 playerP.className = 'discard-item-player';
                 playerP.textContent = `Played by: ${item.playerName}`;
                 
-                const cardEl = createCardElement(item.card, -1);
-
-                discardItemDiv.appendChild(cardEl);
-                discardItemDiv.appendChild(playerP);
-                discardPileList.appendChild(discardItemDiv);
+                // Ensure item.card exists before creating element
+                if (item.card) {
+                    const cardEl = createCardElement(item.card, -1);
+                    discardItemDiv.appendChild(cardEl);
+                    discardItemDiv.appendChild(playerP);
+                    discardPileList.appendChild(discardItemDiv);
+                } else {
+                    console.warn("Discard pile item missing card data:", item);
+                }
             });
         }
         discardPileModal.style.display = 'flex';
+    });
+
+    // *** NEW: Discard Pile Modal OK Listener ***
+    discardPileOkBtn.addEventListener('click', () => {
+        discardPileModal.style.display = 'none';
     });
 
 
@@ -271,7 +308,7 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // *** NEW: Winner Announcement Listener ***
+    // *** Winner Announcement Listener ***
     socket.on('announceRoundWinner', ({ winnerNames }) => {
         let message = `${winnerNames} wins the round!`;
         if (winnerNames.includes(' and ')) {
@@ -280,7 +317,7 @@ window.addEventListener('DOMContentLoaded', () => {
         showUnoAnnouncement(message);
     });
 
-    // *** MODIFIED: Delayed Scoreboard ***
+    // *** Delayed Scoreboard ***
     socket.on('roundOver', ({ winnerName, scores, finalGameState }) => {
         // Wait for the announcement to finish
         setTimeout(() => {
@@ -445,7 +482,6 @@ window.addEventListener('DOMContentLoaded', () => {
 
     function showUnoAnnouncement(message) {
         unoAnnouncementText.textContent = message;
-        // *** Adjust font size for longer messages ***
         if (message.length > 10) {
             unoAnnouncementText.style.fontSize = '8vw';
         } else {
@@ -454,13 +490,14 @@ window.addEventListener('DOMContentLoaded', () => {
         unoAnnouncementOverlay.classList.add('show');
         setTimeout(() => {
             unoAnnouncementOverlay.classList.remove('show');
-        }, 1900); // Slightly shorter than the scoreboard delay
+        }, 1900); 
     }
 
-    // *** MODIFIED: Read from discardPile object ***
     function isClientMoveValid(playedCard, gameState) {
         if (!gameState || !gameState.discardPile || gameState.discardPile.length === 0) return false;
-        const topCard = gameState.discardPile[0].card; // <-- CHANGED
+        const topDiscard = gameState.discardPile[0]; // Get the discard object
+        if (!topDiscard || !topDiscard.card) return false; // Safety check
+        const topCard = topDiscard.card; // Get the card from the object
         const activeColor = gameState.activeColor;
         const drawPenalty = gameState.drawPenalty;
 
@@ -477,8 +514,8 @@ window.addEventListener('DOMContentLoaded', () => {
         cardElement.classList.add('invalid-shake');
         const cardRect = cardElement.getBoundingClientRect();
         const boardRect = gameBoard.getBoundingClientRect();
-        invalidMoveCallout.style.top = `${cardRect.top - boardRect.top - 40}px`; 
-        invalidMoveCallout.style.left = `${cardRect.left - boardRect.left + (cardRect.width / 2) - (invalidMoveCallout.offsetWidth / 2)}px`; 
+        invalidMoveCallout.style.top = `${cardRect.top - boardRect.top - 40}px`;
+        invalidMoveCallout.style.left = `${cardRect.left - boardRect.left + (cardRect.width / 2) - (invalidMoveCallout.offsetWidth / 2)}px`;
         invalidMoveCallout.classList.add('show');
         setTimeout(() => {
             cardElement.classList.remove('invalid-shake');
@@ -536,7 +573,7 @@ window.addEventListener('DOMContentLoaded', () => {
         const startRect = drawPileEl.getBoundingClientRect();
         const endRect = playerAreaEl.getBoundingClientRect();
         const boardRect = gameBoard.getBoundingClientRect();
-        const smallCardWidth = 80; 
+        const smallCardWidth = 80;
         const scaleFactor = smallCardWidth / startRect.width;
 
         for (let i = 0; i < count; i++) {
@@ -544,19 +581,24 @@ window.addEventListener('DOMContentLoaded', () => {
             cardBack.className = 'card card-back flying-card';
 
             cardBack.style.top = `${startRect.top - boardRect.top}px`;
-            cardBack.style.left = `${startRect.left - boardRect.top}px`;
+            cardBack.style.left = `${startRect.left - boardRect.top}px`; // Corrected: Use boardRect.top
+            cardBack.style.width = `${startRect.width}px`; // Set initial size
+            cardBack.style.height = `${startRect.height}px`;
             cardBack.style.transform = 'scale(1.2)';
             gameBoard.appendChild(cardBack);
 
             setTimeout(() => {
                 requestAnimationFrame(() => {
                     const top = `${endRect.top - boardRect.top + 10}px`;
-                    const left = `${endRect.left - boardRect.left + (i * 20)}px`;
+                    // Stagger cards slightly horizontally in the player's hand area
+                    const left = `${endRect.left - boardRect.left + (i * (smallCardWidth / 4))}px`;
                     cardBack.style.transform = `scale(${scaleFactor})`;
                     cardBack.style.top = top;
                     cardBack.style.left = left;
+                    cardBack.style.width = `${smallCardWidth}px`; // Final size
+                    cardBack.style.height = `${smallCardWidth * 1.5}px`; // Maintain aspect ratio
                 });
-            }, i * 100);
+            }, i * 100 + 50); // Add slight delay before starting animation
 
             setTimeout(() => {
                 cardBack.remove();
@@ -642,8 +684,11 @@ window.addEventListener('DOMContentLoaded', () => {
         let footerHtml = '<tfoot><tr><td><strong>Total</strong></td>';
         let lowestScore = Infinity;
         players.forEach(p => {
-            if (p.score < lowestScore) {
-                lowestScore = p.score;
+            // Only consider active/disconnected players for winning score
+            if (p.status === 'Active' || p.status === 'Disconnected') {
+                if (p.score < lowestScore) {
+                    lowestScore = p.score;
+                }
             }
             footerHtml += `<td><strong>${p.score}</strong></td>`;
         });
@@ -653,7 +698,7 @@ window.addEventListener('DOMContentLoaded', () => {
         finalScoreTableContainer.innerHTML = '';
         finalScoreTableContainer.appendChild(table);
 
-        const winners = players.filter(p => p.score === lowestScore);
+        const winners = players.filter(p => (p.status === 'Active' || p.status === 'Disconnected') && p.score === lowestScore);
         const winnerNames = winners.map(w => w.name).join(' and ');
         finalWinnerMessage.textContent = `${winnerNames} win(s) the game!`;
     }
@@ -661,6 +706,14 @@ window.addEventListener('DOMContentLoaded', () => {
 
     function createCardElement(card, cardIndex) {
         const cardDiv = document.createElement('div');
+        // Safety check for card data
+        if (!card || !card.color || !card.value) {
+            console.error("Attempted to create card element with invalid data:", card);
+            cardDiv.className = 'card Black'; // Default fallback
+            cardDiv.textContent = '?';
+            return cardDiv;
+        }
+
         cardDiv.className = `card ${card.color}`;
         cardDiv.dataset.cardIndex = cardIndex;
 
@@ -691,6 +744,8 @@ window.addEventListener('DOMContentLoaded', () => {
         }
 
         function touchDown(e) {
+            // Prevent default touch behavior like scrolling
+            // e.preventDefault(); // Commented out - might prevent scrolling inside modal if needed
             pos3 = e.touches[0].clientX;
             pos4 = e.touches[0].clientY;
             document.ontouchend = closeDragElement;
@@ -703,18 +758,26 @@ window.addEventListener('DOMContentLoaded', () => {
             pos2 = pos4 - e.clientY;
             pos3 = e.clientX;
             pos4 = e.clientY;
-            element.style.top = (element.offsetTop - pos2) + "px";
-            element.style.left = (element.offsetLeft - pos1) + "px";
+            // Ensure modal stays within viewport boundaries (optional, basic example)
+            let newTop = element.offsetTop - pos2;
+            let newLeft = element.offsetLeft - pos1;
+            // newTop = Math.max(0, Math.min(newTop, window.innerHeight - element.offsetHeight));
+            // newLeft = Math.max(0, Math.min(newLeft, window.innerWidth - element.offsetWidth));
+            element.style.top = newTop + "px";
+            element.style.left = newLeft + "px";
         }
 
         function elementTouchDrag(e) {
-            e.preventDefault();
+            // Prevent default touch behavior like scrolling while dragging
+             e.preventDefault();
             pos1 = pos3 - e.touches[0].clientX;
             pos2 = pos4 - e.touches[0].clientY;
             pos3 = e.touches[0].clientX;
             pos4 = e.touches[0].clientY;
-            element.style.top = (element.offsetTop - pos2) + "px";
-            element.style.left = (element.offsetLeft - pos1) + "px";
+            let newTop = element.offsetTop - pos2;
+            let newLeft = element.offsetLeft - pos1;
+            element.style.top = newTop + "px";
+            element.style.left = newLeft + "px";
         }
 
         function closeDragElement() {
@@ -725,14 +788,23 @@ window.addEventListener('DOMContentLoaded', () => {
         }
 
         if (header) {
+            header.style.cursor = 'move'; // Add visual cue
             header.onmousedown = dragMouseDown;
             header.ontouchstart = touchDown;
+        } else {
+             // If no specific header, make the whole modal content draggable (less ideal)
+             const content = element.querySelector('.modal-content');
+             if (content) {
+                content.style.cursor = 'move';
+                content.onmousedown = dragMouseDown;
+                content.ontouchstart = touchDown;
+             }
         }
     }
 
 
     function displayGame(gameState) {
-        window.gameState = gameState; 
+        window.gameState = gameState;
 
         if (countdownInterval) {
             clearInterval(countdownInterval);
@@ -744,7 +816,6 @@ window.addEventListener('DOMContentLoaded', () => {
 
         const myPlayer = gameState.players.find(p => p.playerId === myPersistentPlayerId);
         if (!myPlayer) {
-            // Failsafe in case player is removed mid-game
             showToast("You have been removed from the game.");
             sessionStorage.clear();
             setTimeout(() => location.reload(), 1500);
@@ -752,7 +823,7 @@ window.addEventListener('DOMContentLoaded', () => {
         }
 
         const isMyTurn = myPlayer && gameState.players[gameState.currentPlayerIndex]?.playerId === myPlayer.playerId;
-        const isPaused = gameState.isPaused; 
+        const isPaused = gameState.isPaused;
         const isHost = myPlayer.isHost;
 
         endGameBtn.style.display = (isHost && !gameState.roundOver) ? 'block' : 'none';
@@ -801,9 +872,8 @@ window.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // *** MODIFIED: Hide modal if not my turn to click ***
         if (gameState.roundOver && !gameState.readyForNextRound.includes(myPlayer.playerId)) {
-            // This is handled by the socket.on('roundOver') event with its new delay
+            // Handled by socket.on('roundOver')
         } else if (!gameState.roundOver) {
             endOfRoundDiv.style.display = 'none';
         }
@@ -830,16 +900,14 @@ window.addEventListener('DOMContentLoaded', () => {
             if (currentPlayer) {
                 const pickUntilInfo = gameState.pickUntilState;
                 const isPickUntilActive = pickUntilInfo?.active && pickUntilInfo.targetPlayerIndex === gameState.currentPlayerIndex;
-                
-                // *** START: NAME CHANGE (DELETED `firstName`) ***
+
                 if (isPickUntilActive) {
-                    drawCardBtn.textContent = `${currentPlayer.name} PICKS FOR ${pickUntilInfo.targetColor.toUpperCase()}`; // <-- CHANGED
+                    drawCardBtn.textContent = `${currentPlayer.name} PICKS FOR ${pickUntilInfo.targetColor.toUpperCase()}`;
                 } else if (gameState.drawPenalty > 0) {
-                    drawCardBtn.textContent = `${currentPlayer.name} DRAWS ${gameState.drawPenalty}`; // <-- CHANGED
+                    drawCardBtn.textContent = `${currentPlayer.name} DRAWS ${gameState.drawPenalty}`;
                 } else {
                     drawCardBtn.textContent = 'DRAW CARD';
                 }
-                // *** END: NAME CHANGE ***
 
                 drawCardBtn.disabled = !isMyTurn || isPaused || gameState.roundOver;
             } else {
@@ -870,7 +938,6 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // *** MODIFIED: Read from discardPile object ***
     function renderPiles(gameState) {
         const pilesArea = document.getElementById('piles-area');
         pilesArea.innerHTML = '';
@@ -898,14 +965,13 @@ window.addEventListener('DOMContentLoaded', () => {
         discardCount.textContent = `(${gameState.discardPile.length} Cards)`;
         const discardPileDiv = document.createElement('div');
         discardPileDiv.id = 'discard-pile-dropzone';
-        
-        // *** MODIFIED: Get top card from object ***
-        const topDiscard = gameState.discardPile[0]; 
-        if (topDiscard) {
-            const topCardElement = createCardElement(topDiscard.card, -1); // <-- CHANGED
+
+        const topDiscard = gameState.discardPile[0];
+        if (topDiscard && topDiscard.card) { // Safety check
+            const topCardElement = createCardElement(topDiscard.card, -1);
             discardPileDiv.appendChild(topCardElement);
         }
-        
+
         discardPileWrapper.appendChild(discardPileTitle);
         discardPileWrapper.appendChild(discardCount);
         discardPileWrapper.appendChild(discardPileDiv);
@@ -914,21 +980,25 @@ window.addEventListener('DOMContentLoaded', () => {
         pilesArea.appendChild(pilesContainer);
 
         const dropZone = document.getElementById('discard-pile-dropzone');
-        dropZone.addEventListener('dragover', (e) => {
+        // Ensure event listeners are added only once or cleared if re-rendered
+        // (This basic implementation might add listeners multiple times if renderPiles is called often without clearing)
+        dropZone.ondragover = (e) => { // Use on-event handlers to avoid duplicates simply
             e.preventDefault();
             dropZone.classList.add('over');
-        });
-        dropZone.addEventListener('dragleave', () => {
+        };
+        dropZone.ondragleave = () => {
             dropZone.classList.remove('over');
-        });
-        dropZone.addEventListener('drop', (e) => {
+        };
+        dropZone.ondrop = (e) => {
             e.preventDefault();
             dropZone.classList.remove('over');
             if (draggedCardIndex !== -1) {
                 const myPlayer = gameState.players.find(p => p.playerId === myPersistentPlayerId);
-                const isMyTurn = myPlayer && gameState.players[gameState.currentPlayerIndex].playerId === myPlayer.playerId;
+                const currentPlayer = gameState.players[gameState.currentPlayerIndex]; // Added check
+                const isMyTurn = myPlayer && currentPlayer && currentPlayer.playerId === myPlayer.playerId;
 
-                if(isMyTurn && !gameState.isPaused && !gameState.roundOver) { 
+
+                if(isMyTurn && !gameState.isPaused && !gameState.roundOver) {
                     const playedCard = myPlayer.hand[draggedCardIndex];
                     if (isClientMoveValid(playedCard, gameState)) {
                         socket.emit('playCard', { cardIndex: draggedCardIndex });
@@ -938,8 +1008,12 @@ window.addEventListener('DOMContentLoaded', () => {
                         }
                     }
                 }
+                 // Reset drag state regardless of validity
+                if (draggedCardElement) draggedCardElement.style.opacity = '1';
+                draggedCardElement = null;
+                draggedCardIndex = -1;
             }
-        });
+        };
     }
 
     function renderPlayers(gameState) {
@@ -948,7 +1022,7 @@ window.addEventListener('DOMContentLoaded', () => {
         const myPlayer = gameState.players.find(p => p.playerId === myPersistentPlayerId);
         if (!myPlayer) return;
 
-        const isHost = myPlayer.isHost; 
+        const isHost = myPlayer.isHost;
 
         gameState.players.forEach((player, playerIndex) => {
             const playerArea = document.createElement('div');
@@ -961,9 +1035,10 @@ window.addEventListener('DOMContentLoaded', () => {
                 playerArea.classList.add('disconnected', 'removed');
             }
 
-            const isCurrentPlayer = playerIndex === gameState.currentPlayerIndex;
+            const currentPlayer = gameState.players[gameState.currentPlayerIndex]; // Added check
+            const isCurrentPlayer = currentPlayer && playerIndex === gameState.currentPlayerIndex;
             const isDealerChoosing = player.playerId === gameState.needsDealChoice;
-            if ((isCurrentPlayer && player.status === 'Active' && !gameState.isPaused && !gameState.roundOver) || isDealerChoosing) { 
+            if ((isCurrentPlayer && player.status === 'Active' && !gameState.isPaused && !gameState.roundOver) || isDealerChoosing) {
                 playerArea.classList.add('active-player');
             }
 
@@ -979,7 +1054,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
             const playerInfo = document.createElement('div');
             playerInfo.className = 'player-info';
-            
+
             const nameSpan = document.createElement('span');
             const hostIndicator = player.isHost ? '👑 ' : '';
             nameSpan.innerHTML = `${hostIndicator}${player.name} (${player.hand.length} cards) <span class="player-score">Score: ${player.score}</span>`;
@@ -999,22 +1074,23 @@ window.addEventListener('DOMContentLoaded', () => {
             cardContainer.className = 'card-container';
 
             if (player.playerId === myPersistentPlayerId) {
-                const serverHand = window.gameState.players.find(p => p.playerId === myPersistentPlayerId).hand;
+                 // Get the hand directly from the current gameState being rendered
+                const currentHand = player.hand;
 
-                player.hand.forEach((card, clientIndex) => {
-                    const originalCardIndex = serverHand.findIndex((serverCard, serverIndex) => 
-                        serverCard.color === card.color && serverCard.value === card.value && !Array.from(cardContainer.children).some(el => parseInt(el.dataset.cardIndex) === serverIndex)
-                    );
+                currentHand.forEach((card, indexInHand) => {
+                    // We need the original index if the hand was ever rearranged server-side
+                    // But since we send the whole hand on rearrange, `indexInHand` *should* be the correct index relative to the *current* server state.
+                    const originalCardIndex = indexInHand; // Assuming simple case for now
 
                     const cardEl = createCardElement(card, originalCardIndex);
 
-                    const isMyTurn = playerIndex === gameState.currentPlayerIndex;
-                    if (isMyTurn && !gameState.isPaused && !gameState.roundOver && player.status === 'Active') { 
+                    const isMyTurn = isCurrentPlayer; // Use already calculated variable
+                    if (isMyTurn && !gameState.isPaused && !gameState.roundOver && player.status === 'Active') {
                         cardEl.classList.add('clickable');
                     }
 
                     cardEl.addEventListener('click', () => {
-                        if (isMyTurn && !gameState.isPaused && !gameState.roundOver && player.status === 'Active') { 
+                        if (isMyTurn && !gameState.isPaused && !gameState.roundOver && player.status === 'Active') {
                             if (isClientMoveValid(card, gameState)) {
                                 socket.emit('playCard', { cardIndex: originalCardIndex });
                             } else {
@@ -1023,59 +1099,78 @@ window.addEventListener('DOMContentLoaded', () => {
                         }
                     });
 
-                    cardEl.draggable = !gameState.isPaused && !gameState.roundOver; 
+                    cardEl.draggable = isMyTurn && !gameState.isPaused && !gameState.roundOver; // Only draggable on my turn
                     cardContainer.appendChild(cardEl);
                 });
 
-                cardContainer.addEventListener('dragstart', e => {
-                    if (gameState.isPaused || gameState.roundOver) { 
+
+                 // --- Drag and Drop for Player's Hand ---
+                cardContainer.ondragstart = e => { // Use on-event handlers
+                    if (!e.target.classList.contains('card') || gameState.isPaused || gameState.roundOver) {
                         e.preventDefault();
                         return;
                     }
-                    if (e.target.classList.contains('card')) {
-                       draggedCardElement = e.target;
-                       draggedCardIndex = parseInt(e.target.dataset.cardIndex);
-                       setTimeout(() => e.target.style.opacity = '0.5', 0);
-                    }
-                });
+                    draggedCardElement = e.target;
+                    draggedCardIndex = parseInt(e.target.dataset.cardIndex);
+                    // Add dragging class for visual feedback (optional)
+                     setTimeout(() => e.target.classList.add('dragging'), 0);
+                    // Use dataTransfer for better drag compatibility (optional but good practice)
+                    // e.dataTransfer.setData('text/plain', draggedCardIndex);
+                    // e.dataTransfer.effectAllowed = 'move';
+                };
 
-                cardContainer.addEventListener('dragend', e => {
-                    if (e.target.classList.contains('card')) {
-                    e.target.classList.remove('dragging');
-                       setTimeout(() => {
-                            e.target.style.opacity = '1';
-                            const myCurrentPlayerState = window.gameState.players.find(p => p.playerId === myPersistentPlayerId);
-                            if (myCurrentPlayerState) {
-                                const newElements = [...cardContainer.querySelectorAll('.card')];
-                                const newIndices = newElements.map(el => parseInt(el.dataset.cardIndex));
-                                const serverHand = window.gameState.players.find(p => p.playerId === myPersistentPlayerId).hand;
-                                const reorderedHand = newIndices.map(originalIndex => serverHand[originalIndex]).filter(Boolean);
-
-                                if (reorderedHand.length === myPlayer.hand.length) {
-                                    socket.emit('rearrangeHand', { newHand: reorderedHand });
-                                    myPlayer.hand = reorderedHand;
-                                }
-                            }
-                            draggedCardElement = null;
-                            draggedCardIndex = -1;
-                       }, 0);
-                    }
-                });
-
-                cardContainer.addEventListener('dragover', e => {
-                    e.preventDefault();
-                    if (gameState.isPaused || gameState.roundOver) return; 
-                    const afterElement = getDragAfterElement(cardContainer, e.clientX);
+                cardContainer.ondragend = e => { // Use on-event handlers
                     if (draggedCardElement) {
-                        if (afterElement == null) {
-                            cardContainer.appendChild(draggedCardElement);
-                        } else {
-                            cardContainer.insertBefore(draggedCardElement, afterElement);
-                        }
-                    }
-                });
+                        draggedCardElement.classList.remove('dragging');
+                        // Update opacity immediately
+                        draggedCardElement.style.opacity = '1';
 
-            } else { 
+                        // Check if the drop occurred *outside* a valid dropzone (like discard pile)
+                        // If dropped outside, or drag cancelled, potentially re-render or just reset state
+                         // Re-ordering logic:
+                        const myCurrentPlayerState = window.gameState?.players.find(p => p.playerId === myPersistentPlayerId);
+                        if (myCurrentPlayerState) {
+                             const newElements = [...cardContainer.querySelectorAll('.card')];
+                             // Filter out the ghost element if it's still there briefly
+                             const validElements = newElements.filter(el => el !== draggedCardElement || !el.classList.contains('dragging'));
+                             const newIndices = validElements.map(el => parseInt(el.dataset.cardIndex));
+
+                             // Get the server hand corresponding to the *current* gameState
+                             const serverHand = myCurrentPlayerState.hand;
+
+                             // Check if indices are valid and match hand length before reordering
+                            if (newIndices.length === serverHand.length && newIndices.every(idx => idx >= 0 && idx < serverHand.length)) {
+                                const reorderedHand = newIndices.map(originalIndex => serverHand[originalIndex]).filter(Boolean); // Filter out potential undefineds
+                                if (reorderedHand.length === serverHand.length) { // Final check
+                                    socket.emit('rearrangeHand', { newHand: reorderedHand });
+                                     // Optimistic update (optional)
+                                     myPlayer.hand = reorderedHand;
+                                     // Re-render just my hand immediately might be smoother
+                                     // renderPlayers(window.gameState); // Be careful of infinite loops
+                                }
+                            } else {
+                                console.warn("Index mismatch during drag reorder, not sending update.");
+                                // Force re-render from server state if needed
+                                // displayGame(window.gameState);
+                            }
+                        }
+                        draggedCardElement = null;
+                        draggedCardIndex = -1;
+                    }
+                };
+
+                cardContainer.ondragover = e => { // Use on-event handlers
+                    e.preventDefault();
+                    if (!draggedCardElement || gameState.isPaused || gameState.roundOver) return; // Only allow drop if dragging and game active
+                    const afterElement = getDragAfterElement(cardContainer, e.clientX);
+                    if (afterElement == null) {
+                        cardContainer.appendChild(draggedCardElement);
+                    } else {
+                        cardContainer.insertBefore(draggedCardElement, afterElement);
+                    }
+                };
+
+            } else { // Other players
                 if (gameState.roundOver && player.status === 'Active') {
                     player.hand.forEach((card, cardIndex) => {
                         const cardEl = createCardElement(card, cardIndex);
@@ -1109,6 +1204,7 @@ window.addEventListener('DOMContentLoaded', () => {
         return draggableElements.reduce((closest, child) => {
             const box = child.getBoundingClientRect();
             const offset = x - box.left - box.width / 2;
+            // Find the element immediately to the right of the cursor
             if (offset < 0 && offset > closest.offset) {
                 return { offset: offset, element: child };
             } else {
@@ -1126,7 +1222,8 @@ window.addEventListener('DOMContentLoaded', () => {
     makeDraggable(document.getElementById('confirm-end-game-modal'));
     makeDraggable(document.getElementById('end-of-round-div'));
     makeDraggable(document.getElementById('final-score-modal'));
-    makeDraggable(document.getElementById('afk-notification-modal')); 
-    makeDraggable(document.getElementById('discard-pile-modal')); // *** NEW ***
+    makeDraggable(document.getElementById('afk-notification-modal'));
+    makeDraggable(document.getElementById('discard-pile-modal'));
+    makeDraggable(document.getElementById('confirm-afk-modal')); // *** NEW ***
 
 });
