@@ -122,9 +122,10 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  /* Adjust justification if direction indicator pushes things */
+  justify-content: flex-start;
   align-items: center;
-  gap: 20px;
+  gap: 15px; /* Reduced gap slightly */
   padding: 10px;
   background-color: rgba(0,0,0,0.2);
   border-radius: 10px;
@@ -323,6 +324,7 @@ body {
   align-items: center;
   gap: 15px;
   width: 100%;
+  margin-top: auto; /* Push buttons to bottom */
 }
 
 .action-buttons button {
@@ -662,7 +664,8 @@ body {
     box-shadow: 0 4px 8px rgba(0,0,0,0.3);
 }
 
-#next-round-btn, #confirm-end-yes-btn, #final-score-ok-btn, #next-round-ok-btn, #im-back-btn, #discard-pile-ok-btn, #confirm-afk-yes-btn {
+/* *** MODIFIED: Added #discarded-wilds-ok-btn *** */
+#next-round-btn, #confirm-end-yes-btn, #final-score-ok-btn, #next-round-ok-btn, #im-back-btn, #discard-pile-ok-btn, #confirm-afk-yes-btn, #discarded-wilds-ok-btn {
     background-color: #55aa55;
     border-color: #448844;
     color: white;
@@ -772,13 +775,89 @@ body {
     text-align: left;
 }
 
+/* *** NEW: Styles for the Discarded Wilds Modal *** */
+#discarded-wilds-list {
+    max-height: 50vh; /* Allow scrolling if many cards */
+    overflow-y: auto;
+    margin-top: 15px;
+    padding: 10px;
+    background-color: rgba(0,0,0,0.1);
+    border-radius: 5px;
+    display: flex;
+    flex-direction: column; /* Stack player sections vertically */
+    gap: 15px; /* Space between player sections */
+}
+
+.discarded-wilds-player-section {
+    padding: 10px;
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+}
+
+.discarded-wilds-player-section h4 { /* Player Name */
+    margin: 0 0 8px 0;
+    text-align: left;
+    color: #eee;
+}
+
+.discarded-wilds-player-section .card-container { /* Card container within the modal */
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    justify-content: flex-start; /* Align cards to the left */
+    min-height: initial; /* Override default min-height */
+}
+
+/* Smaller card style specifically for this modal */
+#discarded-wilds-list .card {
+    width: 45px;
+    height: 65px;
+    font-size: 16px;
+    border-width: 1px;
+    border-radius: 4px;
+}
+#discarded-wilds-list .card .number-circle {
+    width: 25px;
+    height: 25px;
+    font-size: 16px;
+    border-width: 1px;
+}
+#discarded-wilds-list .card .action-text {
+    font-size: 9px;
+    transform: rotate(-30deg);
+}
+/* *** END: Styles for the Discarded Wilds Modal *** */
+
+/* *** NEW: Direction Indicator Styles *** */
+#direction-indicator-container {
+    text-align: center;
+    color: white;
+    margin-top: 5px; /* Reduced top margin */
+    margin-bottom: 5px; /* Added bottom margin */
+    order: -1; /* Try to place it before action buttons in flex */
+}
+
+#direction-indicator-container h4 {
+     margin: 0 0 2px 0; /* Reduced bottom margin */
+     font-size: 0.9em; /* Slightly smaller */
+}
+
+#direction-indicator {
+    font-size: 2.5em; /* Adjusted size */
+    font-weight: bold;
+    line-height: 1;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.7);
+    transition: transform 0.3s ease-in-out;
+}
+/* *** END: Direction Indicator Styles *** */
+
 
 /* Responsive Layout for Mobile Devices */
 @media (max-width: 768px) {
     body {
         padding: 5px;
-        /* Increased padding for more scroll space below fixed buttons */
-        padding-bottom: 200px;
+        /* *** INCREASED PADDING FOR MOBILE LOG VISIBILITY *** */
+        padding-bottom: 280px;
         overflow-y: auto;
         overflow-x: hidden;
     }
@@ -803,8 +882,8 @@ body {
         gap: 15px;
         padding: 5px 0;
         overflow-y: visible; /* Rely on body scroll */
-        /* *** INCREASED MARGIN FOR LOG VISIBILITY *** */
-        margin-bottom: 20px; /* reduced buffer */
+        /* Reduced margin, rely on body padding */
+        margin-bottom: 20px;
     }
 
     .player-area {
@@ -879,4 +958,13 @@ body {
     .card-container {
         min-height: 95px;
     }
+
+    /* *** NEW: Mobile Direction Indicator Styles *** */
+     #direction-indicator-container {
+        margin-top: 10px;
+        margin-bottom: 10px;
+     }
+     #direction-indicator {
+        font-size: 2em; /* Slightly smaller on mobile */
+     }
 }

@@ -30,6 +30,10 @@
         <div id="left-column"></div>
         <div id="right-column">
             <div id="piles-area"></div>
+            <div id="direction-indicator-container">
+                 <h4>Direction:</h4>
+                 <div id="direction-indicator"></div>
+            </div>
             <div class="action-buttons">
                 <button id="drawCardBtn">DRAW CARD</button>
                 <button id="unoBtn">UNO</button>
@@ -102,6 +106,17 @@
             <div class="modal-buttons-container">
                 <button id="confirm-afk-yes-btn">Yes</button>
                 <button id="confirm-afk-no-btn">No</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="discarded-wilds-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3>Wild Cards Discarded!</h3>
+            <div id="discarded-wilds-list">
+                </div>
+            <div class="modal-buttons-container">
+                <button id="discarded-wilds-ok-btn">OK</button>
             </div>
         </div>
     </div>
