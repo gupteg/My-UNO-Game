@@ -122,10 +122,9 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  /* Adjust justification if direction indicator pushes things */
-  justify-content: flex-start;
+  justify-content: flex-start; /* Ensure top alignment */
   align-items: center;
-  gap: 15px; /* Reduced gap slightly */
+  gap: 15px;
   padding: 10px;
   background-color: rgba(0,0,0,0.2);
   border-radius: 10px;
@@ -151,12 +150,32 @@ body {
   font-size: 1.2em;
   font-weight: bold;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* Ensure enough space for name, arrow, and button */
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 10px; /* Add gap between elements */
 }
+
+/* *** NEW: Style for player name span to allow ellipsis *** */
+.player-name-info {
+    flex-grow: 1; /* Allow name to take available space */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* *** NEW: Style for the direction arrow *** */
+.direction-arrow {
+    font-size: 1.5em; /* Adjust size as needed */
+    color: #ffc107; /* Match action bar color */
+    font-weight: bold;
+    line-height: 1;
+    text-shadow: 1px 1px 2px black;
+    order: 2; /* Position after name */
+    flex-shrink: 0; /* Prevent arrow from shrinking */
+}
+
 
 .mark-afk-btn {
     padding: 3px 8px;
@@ -167,8 +186,10 @@ body {
     border: 1px solid #cc8e00;
     border-radius: 5px;
     cursor: pointer;
-    margin-left: 10px;
+    /* margin-left: 10px; No longer needed with gap */
     white-space: nowrap;
+    order: 3; /* Position after arrow */
+    flex-shrink: 0; /* Prevent button from shrinking */
 }
 .mark-afk-btn:hover {
     background-color: #e6a700;
@@ -275,6 +296,7 @@ body {
 
 #piles-area {
   color: white;
+  width: 100%; /* Ensure it takes full width */
 }
 
 .pile-wrapper {
@@ -324,7 +346,7 @@ body {
   align-items: center;
   gap: 15px;
   width: 100%;
-  margin-top: auto; /* Push buttons to bottom */
+  margin-top: auto; /* Push buttons to bottom within right column */
 }
 
 .action-buttons button {
@@ -383,7 +405,7 @@ body {
 
 .modal-content h3, .modal-content h2, .modal-content p {
     cursor: move;
-    user-select: none; /* Prevent text selection while dragging */
+    user-select: none;
 }
 
 
@@ -596,6 +618,10 @@ body {
   color: white;
   text-align: center;
   padding: 0 10px;
+  /* Added margin-top to push it down slightly from buttons */
+  margin-top: 15px;
+  /* Ensure it doesn't overlap other flex items */
+  flex-shrink: 0;
 }
 #game-log-container h4 {
   margin: 0 0 5px 0;
@@ -608,6 +634,8 @@ body {
   margin: 0;
   display: flex;
   flex-direction: column;
+  max-height: 200px; /* Give log a max height */
+  overflow-y: auto; /* Allow log itself to scroll if needed */
 }
 #game-log-list li {
   background-color: rgba(0,0,0,0.3);
@@ -619,6 +647,7 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   animation: slide-in 0.4s ease-out;
+  flex-shrink: 0; /* Prevent list items from shrinking */
 }
 
 #game-log-list li:first-child {
@@ -627,14 +656,8 @@ body {
 }
 
 @keyframes slide-in {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .modal-content {
@@ -656,7 +679,7 @@ body {
     background-color: #f0f0f0;
     transition: all 0.2s ease;
     padding: 10px 20px;
-    cursor: pointer; /* Ensure buttons look clickable */
+    cursor: pointer;
 }
 
 .modal-buttons-container button:hover, #next-round-ok-btn:hover {
@@ -664,7 +687,6 @@ body {
     box-shadow: 0 4px 8px rgba(0,0,0,0.3);
 }
 
-/* *** MODIFIED: Added #discarded-wilds-ok-btn *** */
 #next-round-btn, #confirm-end-yes-btn, #final-score-ok-btn, #next-round-ok-btn, #im-back-btn, #discard-pile-ok-btn, #confirm-afk-yes-btn, #discarded-wilds-ok-btn {
     background-color: #55aa55;
     border-color: #448844;
@@ -757,107 +779,38 @@ body {
     width: 100%;
 }
 .discard-item .card {
-    width: 60px;
-    height: 90px;
-    font-size: 24px;
-    flex-shrink: 0; /* Prevent card from shrinking */
+    width: 60px; height: 90px; font-size: 24px; flex-shrink: 0;
 }
-.discard-item .card .number-circle {
-    width: 35px;
-    height: 35px;
-}
-.discard-item .card .action-text {
-    font-size: 14px;
-}
-.discard-item-player {
-    font-size: 1.1em;
-    font-weight: bold;
-    text-align: left;
-}
+.discard-item .card .number-circle { width: 35px; height: 35px; }
+.discard-item .card .action-text { font-size: 14px; }
+.discard-item-player { font-size: 1.1em; font-weight: bold; text-align: left; }
 
-/* *** NEW: Styles for the Discarded Wilds Modal *** */
 #discarded-wilds-list {
-    max-height: 50vh; /* Allow scrolling if many cards */
-    overflow-y: auto;
-    margin-top: 15px;
-    padding: 10px;
-    background-color: rgba(0,0,0,0.1);
-    border-radius: 5px;
-    display: flex;
-    flex-direction: column; /* Stack player sections vertically */
-    gap: 15px; /* Space between player sections */
+    max-height: 50vh; overflow-y: auto; margin-top: 15px; padding: 10px;
+    background-color: rgba(0,0,0,0.1); border-radius: 5px;
+    display: flex; flex-direction: column; gap: 15px;
 }
-
 .discarded-wilds-player-section {
-    padding: 10px;
-    background-color: rgba(255, 255, 255, 0.05);
-    border-radius: 4px;
+    padding: 10px; background-color: rgba(255, 255, 255, 0.05); border-radius: 4px;
 }
-
-.discarded-wilds-player-section h4 { /* Player Name */
-    margin: 0 0 8px 0;
-    text-align: left;
-    color: #eee;
+.discarded-wilds-player-section h4 { margin: 0 0 8px 0; text-align: left; color: #eee; }
+.discarded-wilds-player-section .card-container {
+    display: flex; flex-wrap: wrap; gap: 5px; justify-content: flex-start; min-height: initial;
 }
-
-.discarded-wilds-player-section .card-container { /* Card container within the modal */
-    display: flex;
-    flex-wrap: wrap;
-    gap: 5px;
-    justify-content: flex-start; /* Align cards to the left */
-    min-height: initial; /* Override default min-height */
-}
-
-/* Smaller card style specifically for this modal */
 #discarded-wilds-list .card {
-    width: 45px;
-    height: 65px;
-    font-size: 16px;
-    border-width: 1px;
-    border-radius: 4px;
+    width: 45px; height: 65px; font-size: 16px; border-width: 1px; border-radius: 4px;
 }
-#discarded-wilds-list .card .number-circle {
-    width: 25px;
-    height: 25px;
-    font-size: 16px;
-    border-width: 1px;
-}
-#discarded-wilds-list .card .action-text {
-    font-size: 9px;
-    transform: rotate(-30deg);
-}
-/* *** END: Styles for the Discarded Wilds Modal *** */
+#discarded-wilds-list .card .number-circle { width: 25px; height: 25px; font-size: 16px; border-width: 1px; }
+#discarded-wilds-list .card .action-text { font-size: 9px; transform: rotate(-30deg); }
 
-/* *** NEW: Direction Indicator Styles *** */
-#direction-indicator-container {
-    text-align: center;
-    color: white;
-    margin-top: 5px; /* Reduced top margin */
-    margin-bottom: 5px; /* Added bottom margin */
-    order: -1; /* Try to place it before action buttons in flex */
-}
-
-#direction-indicator-container h4 {
-     margin: 0 0 2px 0; /* Reduced bottom margin */
-     font-size: 0.9em; /* Slightly smaller */
-}
-
-#direction-indicator {
-    font-size: 2.5em; /* Adjusted size */
-    font-weight: bold;
-    line-height: 1;
-    text-shadow: 2px 2px 4px rgba(0,0,0,0.7);
-    transition: transform 0.3s ease-in-out;
-}
-/* *** END: Direction Indicator Styles *** */
-
+/* REMOVED Old Direction Indicator Styles */
 
 /* Responsive Layout for Mobile Devices */
 @media (max-width: 768px) {
     body {
         padding: 5px;
-        /* *** INCREASED PADDING FOR MOBILE LOG VISIBILITY *** */
-        padding-bottom: 280px;
+        /* Reverted body padding */
+        padding-bottom: 90px;
         overflow-y: auto;
         overflow-x: hidden;
     }
@@ -868,103 +821,55 @@ body {
     }
 
     #left-column {
-        flex: 1;
-        padding-right: 0;
-        gap: 8px;
-        overflow-y: visible; /* Rely on body scroll */
+        flex: 1; padding-right: 0; gap: 8px; overflow-y: visible;
     }
 
     #right-column {
-        flex: none;
-        width: 100%;
-        flex-direction: column;
-        align-items: center;
-        gap: 15px;
-        padding: 5px 0;
-        overflow-y: visible; /* Rely on body scroll */
-        /* Reduced margin, rely on body padding */
+        flex: none; width: 100%; flex-direction: column; align-items: center;
+        gap: 15px; padding: 5px 0; overflow-y: visible;
+        /* Reverted margin */
         margin-bottom: 20px;
     }
 
-    .player-area {
-        width: 100%;
-        box-sizing: border-box;
-    }
-
-    #piles-area .card {
-        width: 100px;
-        height: 150px;
-    }
+    .player-area { width: 100%; box-sizing: border-box; }
+    #piles-area .card { width: 100px; height: 150px; }
 
     .action-buttons {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        flex-direction: row;
-        flex-wrap: wrap; /* Allow wrapping */
-        background-color: rgba(0,0,0,0.7);
-        padding: 10px;
-        box-sizing: border-box;
-        gap: 10px;
-        z-index: 50; /* Ensure it's above other content */
+        position: fixed; bottom: 0; left: 0; flex-direction: row; flex-wrap: wrap;
+        background-color: rgba(0,0,0,0.7); padding: 10px; box-sizing: border-box;
+        gap: 10px; z-index: 50; width: 100%; /* Ensure full width */
     }
 
-    #unoBtn {
-        width: 60px;
-        height: 60px;
-        font-size: 20px;
-        order: 2;
-    }
+    #unoBtn { width: 60px; height: 60px; font-size: 20px; order: 2; }
 
     .action-buttons button {
-        font-size: 14px;
-        padding: 10px;
-        flex: 1 1 40%; /* Allow buttons to share space */
-        min-width: 100px; /* Ensure buttons don't get too small */
+        font-size: 14px; padding: 10px; flex: 1 1 40%; min-width: 100px;
     }
     #drawCardBtn { order: 1; }
-    #arrangeHandBtn {
-        order: 3;
-    }
+    #arrangeHandBtn { order: 3; }
     #showDiscardPileBtn { order: 4; }
     #endGameBtn { order: 5; }
 
-
+    /* *** NEW: Mobile Log Padding *** */
     #game-log-container {
         width: 100%;
-        /* Add some padding so the last log isn't right at the bottom edge */
-        padding-bottom: 10px;
+        /* Add padding at the bottom to push logs above fixed buttons */
+        padding-bottom: 150px; /* Adjust this value as needed */
+        margin-top: 10px; /* Reset or adjust margin */
+    }
+    #game-log-list {
+        max-height: none; /* Remove max-height on mobile */
+        overflow-y: visible; /* Rely on body scroll */
     }
 
-    .card {
-        width: 60px;
-        height: 90px;
-        font-size: 24px;
-    }
+    .card { width: 60px; height: 90px; font-size: 24px; }
+    .card .number-circle { width: 35px; height: 35px; }
+    .card .action-text { font-size: 14px; }
+    .player-info { font-size: 1em; }
+    .card-container { min-height: 95px; }
 
-    .card .number-circle {
-        width: 35px;
-        height: 35px;
+    /* *** NEW: Mobile Direction Arrow Size *** */
+    .direction-arrow {
+        font-size: 1.2em;
     }
-
-    .card .action-text {
-        font-size: 14px;
-    }
-
-    .player-info {
-        font-size: 1em;
-    }
-
-    .card-container {
-        min-height: 95px;
-    }
-
-    /* *** NEW: Mobile Direction Indicator Styles *** */
-     #direction-indicator-container {
-        margin-top: 10px;
-        margin-bottom: 10px;
-     }
-     #direction-indicator {
-        font-size: 2em; /* Slightly smaller on mobile */
-     }
 }
