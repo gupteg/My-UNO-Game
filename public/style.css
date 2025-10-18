@@ -854,7 +854,7 @@ body {
     #game-log-container {
         width: 100%;
         /* Add some padding so the last log isn't right at the bottom edge */
-        padding-bottom: 10px;
+        padding-bottom: 150px; /* <--- MODIFIED AS REQUESTED */
     }
 
     .card {
