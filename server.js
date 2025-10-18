@@ -87,7 +87,7 @@ function setupGame(lobbyPlayers) {
         hand: [],
         unoState: 'safe',
         scoresByRound: [],
-        isConnected: true
+        status: 'Active' // <-- PHASE 1 CHANGE: Replaced isConnected
     }));
     return {
         players: gamePlayers,
@@ -110,11 +110,12 @@ function startNewRound(gs) {
 
     let roundDeck = shuffleDeck(createDeck());
     gs.players.forEach(player => {
-        if (player.isConnected) { // Only deal cards to connected players
+        // <-- PHASE 1 CHANGE: Check status
+        if (player.status === 'Active') { 
             player.hand = roundDeck.splice(0, gs.numCardsToDeal);
             player.unoState = 'safe';
         } else {
-            player.hand = []; // Ensure disconnected players have no cards
+            player.hand = []; // Ensure non-active players have no cards
         }
     });
 
@@ -147,12 +148,14 @@ function startNewRound(gs) {
     io.emit('gameLog', `Round ${gs.roundNumber} begins. ${dealer.name} deals ${gs.numCardsToDeal} cards.`);
 
     let firstPlayerIndex = (gs.dealerIndex + 1) % numPlayers;
-    while (!gs.players[firstPlayerIndex].isConnected) {
+    // <-- PHASE 1 CHANGE: Find next 'Active' player
+    while (gs.players[firstPlayerIndex].status !== 'Active') {
         firstPlayerIndex = (firstPlayerIndex + 1) % numPlayers;
     }
 
     if (topCard.color !== 'Black') {
-        const connectedPlayersCount = gs.players.filter(p => p.isConnected).length;
+        // <-- PHASE 1 CHANGE: Filter by 'Active'
+        const connectedPlayersCount = gs.players.filter(p => p.status === 'Active').length;
 
         if (topCard.value === 'Reverse') {
             if (connectedPlayersCount > 2) {
@@ -160,20 +163,23 @@ function startNewRound(gs) {
                 let tempIndex = gs.dealerIndex;
                 do {
                     tempIndex = (tempIndex - 1 + numPlayers) % numPlayers;
-                } while (!gs.players[tempIndex].isConnected);
+                    // <-- PHASE 1 CHANGE: Find next 'Active' player
+                } while (gs.players[tempIndex].status !== 'Active');
                 firstPlayerIndex = tempIndex;
             } else { // 2-player reverse acts as a skip
                 let tempIndex = firstPlayerIndex;
                 do {
                     tempIndex = (tempIndex + 1 + numPlayers) % numPlayers;
-                } while (!gs.players[tempIndex].isConnected);
+                    // <-- PHASE 1 CHANGE: Find next 'Active' player
+                } while (gs.players[tempIndex].status !== 'Active');
                 firstPlayerIndex = tempIndex;
             }
         } else if (topCard.value === 'Skip') {
             let tempIndex = firstPlayerIndex;
             do {
                 tempIndex = (tempIndex + 1 + numPlayers) % numPlayers;
-            } while (!gs.players[tempIndex].isConnected);
+                // <-- PHASE 1 CHANGE: Find next 'Active' player
+            } while (gs.players[tempIndex].status !== 'Active');
             firstPlayerIndex = tempIndex;
         }
         if (topCard.value === 'Draw Two') {
@@ -204,7 +210,8 @@ function isMoveValid(playedCard, topCard, activeColor, drawPenalty) {
 function advanceTurn() {
     if (!gameState || gameState.roundOver) return;
 
-    const activePlayers = gameState.players.filter(p => p.isConnected);
+    // <-- PHASE 1 CHANGE: Filter by 'Active'
+    const activePlayers = gameState.players.filter(p => p.status === 'Active');
     if (activePlayers.length === 0) return;
 
     const currentPlayer = gameState.players[gameState.currentPlayerIndex];
@@ -215,14 +222,16 @@ function advanceTurn() {
     do {
         const numPlayers = gameState.players.length;
         gameState.currentPlayerIndex = (gameState.currentPlayerIndex + gameState.playDirection + numPlayers) % numPlayers;
-    } while (!gameState.players[gameState.currentPlayerIndex].isConnected);
+        // <-- PHASE 1 CHANGE: Find next 'Active' player
+    } while (gameState.players[gameState.currentPlayerIndex].status !== 'Active');
 }
 
 function applyCardEffect(playedCard) {
     const numPlayers = gameState.players.length;
     switch(playedCard.value) {
         case 'Reverse':
-            if (gameState.players.filter(p=>p.isConnected).length > 2) {
+            // <-- PHASE 1 CHANGE: Filter by 'Active'
+            if (gameState.players.filter(p=>p.status === 'Active').length > 2) {
                 gameState.playDirection *= -1;
             }
             break;
@@ -241,9 +250,11 @@ function handleEndOfRound(winners) {
     const scoresForRound = [];
 
     gameState.players.forEach(p => {
-        const roundScore = p.isConnected ? calculateScore(p.hand) : 0;
+        // <-- PHASE 1 CHANGE: Score 'Active' or 'Disconnected', not 'Removed'
+        const roundScore = (p.status === 'Active' || p.status === 'Disconnected') ? calculateScore(p.hand) : 0;
         p.score += roundScore;
-        p.scoresByRound.push(p.isConnected ? roundScore : '-');
+        // <-- PHASE 1 CHANGE: Log score for 'Active' or 'Disconnected'
+        p.scoresByRound.push((p.status === 'Active' || p.status === 'Disconnected') ? roundScore : '-');
         scoresForRound.push({ name: p.name, roundScore: roundScore, cumulativeScore: p.score });
     });
 
@@ -315,7 +326,8 @@ function handleCardPlay(playerIndex, cardIndex) {
 
         applyCardEffect(playedCard);
 
-        if (playedCard.value === 'Skip' || (playedCard.value === 'Reverse' && gameState.players.filter(p=>p.isConnected).length === 2)) {
+        // <-- PHASE 1 CHANGE: Filter by 'Active'
+        if (playedCard.value === 'Skip' || (playedCard.value === 'Reverse' && gameState.players.filter(p=>p.status === 'Active').length === 2)) {
             advanceTurn();
         }
 
@@ -336,12 +348,14 @@ io.on('connection', (socket) => {
     if (gameState) {
         let playerToRejoin = null;
         if (playerId) {
-            playerToRejoin = gameState.players.find(p => p.playerId === playerId && !p.isConnected);
+            // <-- PHASE 1 CHANGE: Allow 'Disconnected' or 'Removed' to rejoin
+            playerToRejoin = gameState.players.find(p => p.playerId === playerId && p.status !== 'Active');
         }
 
         // --- NEW HYBRID RECONNECTION LOGIC ---
         if (!playerToRejoin) {
-            const disconnectedPlayers = gameState.players.filter(p => !p.isConnected);
+            // <-- PHASE 1 CHANGE: Find non-Active players
+            const disconnectedPlayers = gameState.players.filter(p => p.status !== 'Active');
             const joiningPlayerNameLower = playerName.toLowerCase();
 
             if (disconnectedPlayers.length === 1) {
@@ -369,11 +383,12 @@ io.on('connection', (socket) => {
         if (playerToRejoin) {
             console.log(`${playerName} is rejoining as ${playerToRejoin.name}.`);
 
-            playerToRejoin.isConnected = true;
+            playerToRejoin.status = 'Active'; // <-- PHASE 1 CHANGE
             playerToRejoin.socketId = socket.id;
             playerToRejoin.name = playerName; // Always update to the latest name they entered
 
-            const otherDisconnected = gameState.players.some(p => !p.isConnected);
+            // <-- PHASE 1 CHANGE: Only check for 'Disconnected'. 'Removed' players don't pause the game.
+            const otherDisconnected = gameState.players.some(p => p.status === 'Disconnected');
             if (!otherDisconnected) {
                 if (suspensionTimeoutId) {
                     clearTimeout(suspensionTimeoutId);
@@ -415,12 +430,14 @@ io.on('connection', (socket) => {
     if (!gameState || !playerId) return;
 
     const playerToRejoin = gameState.players.find(p => p.playerId === playerId);
-    if (playerToRejoin && !playerToRejoin.isConnected) {
+    // <-- PHASE 1 CHANGE: Check status
+    if (playerToRejoin && playerToRejoin.status !== 'Active') {
         console.log(`${playerToRejoin.name} is rejoining the game.`);
-        playerToRejoin.isConnected = true;
+        playerToRejoin.status = 'Active'; // <-- PHASE 1 CHANGE
         playerToRejoin.socketId = socket.id;
 
-        const otherDisconnected = gameState.players.some(p => !p.isConnected);
+        // <-- PHASE 1 CHANGE: Only check for 'Disconnected'.
+        const otherDisconnected = gameState.players.some(p => p.status === 'Disconnected');
         if (!otherDisconnected) {
             if (suspensionTimeoutId) {
                 clearTimeout(suspensionTimeoutId);
@@ -432,7 +449,8 @@ io.on('connection', (socket) => {
 
         io.emit('playerReconnected', { playerName: playerToRejoin.name });
         io.emit('updateGameState', gameState);
-    } else if (playerToRejoin && playerToRejoin.isConnected) {
+    // <-- PHASE 1 CHANGE: Check status
+    } else if (playerToRejoin && playerToRejoin.status === 'Active') {
         playerToRejoin.socketId = socket.id;
         socket.emit('updateGameState', gameState);
     }
@@ -454,7 +472,8 @@ io.on('connection', (socket) => {
   function checkAndStartNextRound() {
     if (!gameState) return;
     const host = gameState.players.find(p => p.isHost);
-    const connectedPlayers = gameState.players.filter(p => p.isConnected);
+    // <-- PHASE 1 CHANGE: Filter by 'Active'
+    const connectedPlayers = gameState.players.filter(p => p.status === 'Active');
 
     if (!host) return;
 
@@ -561,7 +580,8 @@ io.on('connection', (socket) => {
 
                     gameState.pickUntilState = null;
 
-                    if (drawnCard.value === 'Skip' || (drawnCard.value === 'Reverse' && gameState.players.filter(p=>p.isConnected).length === 2)) {
+                    // <-- PHASE 1 CHANGE: Filter by 'Active'
+                    if (drawnCard.value === 'Skip' || (drawnCard.value === 'Reverse' && gameState.players.filter(p=>p.status === 'Active').length === 2)) {
                         advanceTurn();
                     }
                     advanceTurn();
@@ -621,8 +641,8 @@ io.on('connection', (socket) => {
                             player.unoState = 'declared';
                             io.emit('unoCalled', { playerName: player.name });
                         }
-
-                        if (drawnCard.value === 'Skip' || (drawnCard.value === 'Reverse' && gameState.players.filter(p=>p.isConnected).length === 2)) {
+                        // <-- PHASE 1 CHANGE: Filter by 'Active'
+                        if (drawnCard.value === 'Skip' || (drawnCard.value === 'Reverse' && gameState.players.filter(p=>p.status === 'Active').length === 2)) {
                             advanceTurn();
                         }
                         advanceTurn();
@@ -703,12 +723,13 @@ io.on('connection', (socket) => {
       } else if (choice === 'pick-color') {
           let nextPlayerIndex = (originalPlayerIndex + gameState.playDirection + numPlayers) % numPlayers;
           let searchLimit = numPlayers; 
-          while (!gameState.players[nextPlayerIndex].isConnected && searchLimit > 0) {
+          // <-- PHASE 1 CHANGE: Find next 'Active' player
+          while (gameState.players[nextPlayerIndex].status !== 'Active' && searchLimit > 0) {
               nextPlayerIndex = (nextPlayerIndex + gameState.playDirection + numPlayers) % numPlayers;
               searchLimit--;
           }
-
-          if (gameState.players[nextPlayerIndex].isConnected && gameState.players[nextPlayerIndex].playerId !== player.playerId) {
+          // <-- PHASE 1 CHANGE: Check status
+          if (gameState.players[nextPlayerIndex].status === 'Active' && gameState.players[nextPlayerIndex].playerId !== player.playerId) {
               gameState.pickUntilState = {
                   targetPlayerIndex: nextPlayerIndex,
                   active: false,
@@ -784,8 +805,9 @@ io.on('connection', (socket) => {
 
     if (gameState) {
         const disconnectedPlayer = gameState.players.find(p => p.socketId === socket.id);
-        if (disconnectedPlayer && disconnectedPlayer.isConnected) {
-            disconnectedPlayer.isConnected = false;
+        // <-- PHASE 1 CHANGE: Check status is 'Active'
+        if (disconnectedPlayer && disconnectedPlayer.status === 'Active') {
+            disconnectedPlayer.status = 'Disconnected'; // <-- PHASE 1 CHANGE
             gameState.isSuspended = true;
             gameState.suspensionInfo = {
                 disconnectTime: Date.now()
@@ -803,8 +825,10 @@ io.on('connection', (socket) => {
                     console.log(`Suspension timer expired.`);
 
                     const currentHost = gameState.players.find(p => p.isHost);
-                    if (currentHost && !currentHost.isConnected) {
-                        const newHost = gameState.players.find(p => p.isConnected);
+                    // <-- PHASE 1 CHANGE: Check status
+                    if (currentHost && currentHost.status !== 'Active') {
+                        // <-- PHASE 1 CHANGE: Find first 'Active'
+                        const newHost = gameState.players.find(p => p.status === 'Active');
                         if (newHost) {
                             currentHost.isHost = false;
                             newHost.isHost = true;
@@ -816,14 +840,23 @@ io.on('connection', (socket) => {
                         }
                     }
 
-                    const disconnectedPlayerNames = gameState.players
-                        .filter(p => !p.isConnected)
+                    // <-- START PHASE 1 CHANGE: New 'Removed' logic
+                    const timedOutPlayerNames = gameState.players
+                        .filter(p => p.status === 'Disconnected')
                         .map(p => p.name)
                         .join(', ');
+                    
+                    // Mark all 'Disconnected' as 'Removed'
+                    gameState.players.forEach(p => {
+                        if (p.status === 'Disconnected') {
+                            p.status = 'Removed';
+                        }
+                    });
 
-                    if (disconnectedPlayerNames) {
-                         io.emit('gameLog', `- ${disconnectedPlayerNames} did not rejoin. Game continues.`);
+                    if (timedOutPlayerNames) {
+                         io.emit('gameLog', `- ${timedOutPlayerNames} did not rejoin. Game continues.`);
                     }
+                    // <-- END PHASE 1 CHANGE
 
                     gameState.isSuspended = false;
                     suspensionInfo = null;
@@ -831,7 +864,8 @@ io.on('connection', (socket) => {
 
                     if (gameState.roundOver) {
                         checkAndStartNextRound();
-                    } else if (gameState.players[gameState.currentPlayerIndex] && !gameState.players[gameState.currentPlayerIndex].isConnected) {
+                    // <-- PHASE 1 CHANGE: Check status
+                    } else if (gameState.players[gameState.currentPlayerIndex] && gameState.players[gameState.currentPlayerIndex].status !== 'Active') {
                        advanceTurn();
                     }
 
