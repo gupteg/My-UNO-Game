@@ -62,6 +62,11 @@ window.addEventListener('DOMContentLoaded', () => {
     const confirmAfkYesBtn = document.getElementById('confirm-afk-yes-btn');
     const confirmAfkNoBtn = document.getElementById('confirm-afk-no-btn');
 
+    // *** NEW: Discard Wilds Modal References ***
+    const discardWildsModal = document.getElementById('discard-wilds-modal');
+    const discardWildsResults = document.getElementById('discard-wilds-results');
+    const discardWildsOkBtn = document.getElementById('discard-wilds-ok-btn');
+
 
     joinScreen.style.display = 'block';
     lobbyScreen.style.display = 'none';
@@ -264,9 +269,14 @@ window.addEventListener('DOMContentLoaded', () => {
         discardPileModal.style.display = 'flex';
     });
 
-    // *** NEW: Discard Pile Modal OK Listener ***
+    // *** Discard Pile Modal OK Listener ***
     discardPileOkBtn.addEventListener('click', () => {
         discardPileModal.style.display = 'none';
+    });
+
+    // *** NEW: Discard Wilds Modal OK Listener ***
+    discardWildsOkBtn.addEventListener('click', () => {
+        discardWildsModal.style.display = 'none';
     });
 
 
@@ -420,6 +430,44 @@ window.addEventListener('DOMContentLoaded', () => {
 
     socket.on('gameLog', (message) => {
         addMessageToGameLog(message);
+    });
+
+    // *** NEW: Listener for Discard Wilds Modal ***
+    socket.on('showDiscardWildsModal', (allDiscardedData) => {
+        discardWildsResults.innerHTML = ''; // Clear previous results
+        
+        if (allDiscardedData.length === 0) {
+             discardWildsResults.innerHTML = '<p>No players had any Wild cards to discard.</p>';
+        } else {
+            allDiscardedData.forEach(playerData => {
+                const playerGroup = document.createElement('div');
+                playerGroup.className = 'discard-result-player';
+                
+                const playerName = document.createElement('p');
+                playerName.className = 'discard-result-player-name';
+                playerName.textContent = `${playerData.playerName} discarded:`;
+                playerGroup.appendChild(playerName);
+    
+                const cardContainer = document.createElement('div');
+                cardContainer.className = 'discard-result-cards';
+    
+                if (playerData.cards.length === 0) {
+                    // This case is handled by the server check, but good to have
+                    const noCardsMsg = document.createElement('span');
+                    noCardsMsg.textContent = '(No cards)';
+                    cardContainer.appendChild(noCardsMsg);
+                } else {
+                    playerData.cards.forEach(card => {
+                        const cardEl = createCardElement(card, -1);
+                        cardContainer.appendChild(cardEl);
+                    });
+                }
+                
+                playerGroup.appendChild(cardContainer);
+                discardWildsResults.appendChild(playerGroup);
+            });
+        }
+        discardWildsModal.style.display = 'flex';
     });
 
     socket.on('animateDraw', ({ playerId, count }) => {
@@ -1245,6 +1293,7 @@ window.addEventListener('DOMContentLoaded', () => {
     makeDraggable(document.getElementById('final-score-modal'));
     makeDraggable(document.getElementById('afk-notification-modal'));
     makeDraggable(document.getElementById('discard-pile-modal'));
-    makeDraggable(document.getElementById('confirm-afk-modal')); // *** NEW ***
+    makeDraggable(document.getElementById('confirm-afk-modal')); 
+    makeDraggable(document.getElementById('discard-wilds-modal')); // *** NEW ***
 
 });

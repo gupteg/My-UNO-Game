@@ -662,7 +662,9 @@ body {
     box-shadow: 0 4px 8px rgba(0,0,0,0.3);
 }
 
-#next-round-btn, #confirm-end-yes-btn, #final-score-ok-btn, #next-round-ok-btn, #im-back-btn, #discard-pile-ok-btn, #confirm-afk-yes-btn {
+#next-round-btn, #confirm-end-yes-btn, #final-score-ok-btn, #next-round-ok-btn, #im-back-btn, #discard-pile-ok-btn, #confirm-afk-yes-btn,
+/* *** NEW: Added OK button style *** */
+#discard-wilds-ok-btn {
     background-color: #55aa55;
     border-color: #448844;
     color: white;
@@ -879,4 +881,50 @@ body {
     .card-container {
         min-height: 95px;
     }
+}
+
+/* *** NEW: Styles for Discard Wilds Modal *** */
+#discard-wilds-results {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    max-height: 50vh;
+    overflow-y: auto;
+    padding: 10px;
+    background-color: rgba(0,0,0,0.2);
+    border-radius: 5px;
+    text-align: left;
+}
+
+.discard-result-player {
+    border-bottom: 1px solid #555;
+    padding-bottom: 10px;
+}
+.discard-result-player:last-child {
+    border-bottom: none;
+}
+
+.discard-result-player-name {
+    font-size: 1.1em;
+    font-weight: bold;
+    margin: 0 0 10px 0;
+}
+
+.discard-result-cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.discard-result-cards .card {
+    width: 60px;
+    height: 90px;
+    font-size: 24px;
+}
+.discard-result-cards .card .number-circle {
+    width: 35px;
+    height: 35px;
+}
+.discard-result-cards .card .action-text {
+    font-size: 14px;
 }
