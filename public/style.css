@@ -778,7 +778,7 @@ body {
     body {
         padding: 5px;
         /* Increased padding for more scroll space below fixed buttons */
-        padding-bottom: 150px;
+        padding-bottom: 200px;
         overflow-y: auto;
         overflow-x: hidden;
     }
@@ -804,7 +804,7 @@ body {
         padding: 5px 0;
         overflow-y: visible; /* Rely on body scroll */
         /* *** INCREASED MARGIN FOR LOG VISIBILITY *** */
-        margin-bottom: 120px; /* Increased buffer */
+        margin-bottom: 20px; /* reduced buffer */
     }
 
     .player-area {
