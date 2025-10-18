@@ -340,6 +340,67 @@ function handleCardPlay(playerIndex, cardIndex) {
     }
 }
 
+// --- START PHASE 2: Refactored Suspension Timer Logic ---
+function startSuspensionTimer() {
+    // Clear any existing timer
+    if (suspensionTimeoutId) {
+        clearTimeout(suspensionTimeoutId);
+    }
+
+    suspensionTimeoutId = setTimeout(() => {
+        if (gameState) {
+            console.log(`Suspension timer expired.`);
+
+            const currentHost = gameState.players.find(p => p.isHost);
+            // Check if host is NOT active
+            if (currentHost && currentHost.status !== 'Active') {
+                const newHost = gameState.players.find(p => p.status === 'Active');
+                if (newHost) {
+                    currentHost.isHost = false;
+                    newHost.isHost = true;
+                    const message = `${currentHost.name} did not rejoin. ${newHost.name} is now the host.`;
+                    io.emit('gameLog', message);
+                    io.emit('announce', message);
+                } else {
+                     io.emit('gameLog', `Host did not rejoin. No other players left.`);
+                }
+            }
+
+            // Find all players who are still 'Disconnected'
+            const timedOutPlayerNames = gameState.players
+                .filter(p => p.status === 'Disconnected')
+                .map(p => p.name)
+                .join(', ');
+            
+            // Mark them as 'Removed'
+            gameState.players.forEach(p => {
+                if (p.status === 'Disconnected') {
+                    p.status = 'Removed';
+                }
+            });
+
+            if (timedOutPlayerNames) {
+                 io.emit('gameLog', `- ${timedOutPlayerNames} did not rejoin. Game continues.`);
+            }
+
+            // Un-pause the game
+            gameState.isSuspended = false;
+            suspensionInfo = null;
+            suspensionTimeoutId = null;
+
+            // Check game state to advance turn if needed
+            if (gameState.roundOver) {
+                checkAndStartNextRound();
+            } else if (gameState.players[gameState.currentPlayerIndex] && gameState.players[gameState.currentPlayerIndex].status !== 'Active') {
+               advanceTurn();
+            }
+
+            io.emit('updateGameState', gameState);
+        }
+    }, 60000); // 60-second timer
+}
+// --- END PHASE 2: Refactored Suspension Timer Logic ---
+
 // --- SOCKET.IO LOGIC ---
 io.on('connection', (socket) => {
   console.log(`Player connected: ${socket.id}`);
@@ -800,6 +861,49 @@ io.on('connection', (socket) => {
     }
   });
 
+  // --- START PHASE 2: New Host Control Listeners ---
+  socket.on('kickPlayer', ({ playerId }) => {
+      // Can only kick from lobby
+      if (gameState) return;
+
+      const host = players.find(p => p.socketId === socket.id && p.isHost);
+      if (!host) return; // Only host can kick
+
+      const playerIndexToKick = players.findIndex(p => p.playerId === playerId);
+      
+      if (playerIndexToKick > -1) {
+          const [kickedPlayer] = players.splice(playerIndexToKick, 1);
+          // Tell the kicked player they were kicked
+          io.to(kickedPlayer.socketId).emit('kicked');
+          // Update everyone else's lobby
+          io.emit('lobbyUpdate', players);
+      }
+  });
+
+  socket.on('markPlayerAFK', ({ playerId }) => {
+      // Can only mark AFK in-game
+      if (!gameState) return;
+
+      const host = gameState.players.find(p => p.socketId === socket.id && p.isHost);
+      if (!host) return; // Only host can mark AFK
+
+      const playerToMark = gameState.players.find(p => p.playerId === playerId);
+
+      // Only mark 'Active' players AFK
+      if (playerToMark && playerToMark.status === 'Active') {
+          playerToMark.status = 'Disconnected';
+          gameState.isSuspended = true;
+          gameState.suspensionInfo = { disconnectTime: Date.now() };
+
+          io.emit('playerDisconnected', { playerName: playerToMark.name });
+          io.emit('updateGameState', gameState);
+          
+          // Use the refactored timer function
+          startSuspensionTimer();
+      }
+  });
+  // --- END PHASE 2: New Host Control Listeners ---
+
   socket.on('disconnect', () => {
     console.log(`Player disconnected: ${socket.id}`);
 
@@ -813,65 +917,11 @@ io.on('connection', (socket) => {
                 disconnectTime: Date.now()
             };
 
-            if (suspensionTimeoutId) {
-                clearTimeout(suspensionTimeoutId);
-            }
-
             io.emit('playerDisconnected', { playerName: disconnectedPlayer.name });
             io.emit('updateGameState', gameState);
 
-            suspensionTimeoutId = setTimeout(() => {
-                if (gameState) {
-                    console.log(`Suspension timer expired.`);
-
-                    const currentHost = gameState.players.find(p => p.isHost);
-                    // <-- PHASE 1 CHANGE: Check status
-                    if (currentHost && currentHost.status !== 'Active') {
-                        // <-- PHASE 1 CHANGE: Find first 'Active'
-                        const newHost = gameState.players.find(p => p.status === 'Active');
-                        if (newHost) {
-                            currentHost.isHost = false;
-                            newHost.isHost = true;
-                            const message = `${currentHost.name} did not rejoin. ${newHost.name} is now the host.`;
-                            io.emit('gameLog', message);
-                            io.emit('announce', message);
-                        } else {
-                             io.emit('gameLog', `Host did not rejoin. No other players left.`);
-                        }
-                    }
-
-                    // <-- START PHASE 1 CHANGE: New 'Removed' logic
-                    const timedOutPlayerNames = gameState.players
-                        .filter(p => p.status === 'Disconnected')
-                        .map(p => p.name)
-                        .join(', ');
-                    
-                    // Mark all 'Disconnected' as 'Removed'
-                    gameState.players.forEach(p => {
-                        if (p.status === 'Disconnected') {
-                            p.status = 'Removed';
-                        }
-                    });
-
-                    if (timedOutPlayerNames) {
-                         io.emit('gameLog', `- ${timedOutPlayerNames} did not rejoin. Game continues.`);
-                    }
-                    // <-- END PHASE 1 CHANGE
-
-                    gameState.isSuspended = false;
-                    suspensionInfo = null;
-                    suspensionTimeoutId = null;
-
-                    if (gameState.roundOver) {
-                        checkAndStartNextRound();
-                    // <-- PHASE 1 CHANGE: Check status
-                    } else if (gameState.players[gameState.currentPlayerIndex] && gameState.players[gameState.currentPlayerIndex].status !== 'Active') {
-                       advanceTurn();
-                    }
-
-                    io.emit('updateGameState', gameState);
-                }
-            }, 60000);
+            // <-- PHASE 2 CHANGE: Use refactored function -->
+            startSuspensionTimer();
         }
     } else {
         players = players.filter(player => player.socketId !== socket.id);
