@@ -342,7 +342,7 @@ body {
   width: 100%;
 }
 
-#arrangeHandBtn {
+#arrangeHandBtn, #showDiscardPileBtn {
   background-color: #6c757d;
   border-color: #5a6268;
   color: white;
@@ -725,7 +725,6 @@ body {
     box-shadow: none !important;
 }
 
-/* <-- START PHASE 1 CHANGE: New 'Removed' styles --> */
 .player-area.disconnected:not(.removed) .player-info > span:first-child::after {
     content: '(Disconnected)';
     font-style: italic;
@@ -746,7 +745,44 @@ body {
     opacity: 0.4;
     border-style: dashed;
 }
-/* <-- END PHASE 1 CHANGE --> */
+
+/* *** NEW: Discard Pile Modal Styles *** */
+#discard-pile-list {
+    max-height: 40vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    align-items: center;
+    padding: 10px;
+    background-color: rgba(0,0,0,0.2);
+    border-radius: 5px;
+}
+.discard-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    width: 100%;
+}
+.discard-item .card {
+    width: 60px;
+    height: 90px;
+    font-size: 24px;
+    flex-shrink: 0; /* Prevent card from shrinking */
+}
+.discard-item .card .number-circle {
+    width: 35px;
+    height: 35px;
+}
+.discard-item .card .action-text {
+    font-size: 14px;
+}
+.discard-item-player {
+    font-size: 1.1em;
+    font-weight: bold;
+    text-align: left;
+}
+/* *** END: Discard Pile Modal Styles *** */
 
 
 /* Responsive Layout for Mobile Devices */
@@ -796,6 +832,7 @@ body {
         bottom: 0;
         left: 0;
         flex-direction: row;
+        flex-wrap: wrap; /* Allow wrapping */
         background-color: rgba(0,0,0,0.7);
         padding: 10px;
         box-sizing: border-box;
@@ -812,13 +849,15 @@ body {
     .action-buttons button {
         font-size: 14px;
         padding: 10px;
-        flex: 1;
+        flex: 1 1 40%; /* Allow buttons to share space */
     }
     #drawCardBtn { order: 1; }
     #arrangeHandBtn { 
         order: 3;
     }
-    #endGameBtn { order: 4; }
+    #showDiscardPileBtn { order: 4; } /* *** NEW *** */
+    #endGameBtn { order: 5; } /* *** UPDATED *** */
+
 
     #game-log-container {
         width: 100%;

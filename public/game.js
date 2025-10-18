@@ -1,1083 +1,1016 @@
-window.addEventListener('DOMContentLoaded', () => {
-    const socket = io(); // Assuming server is on the same origin
-    // const socket = io('https://gupte-family-uno-game.onrender.com'); // Use this for production
+const http = require('http');
+const express = require('express');
+const path = require('path');
+const { Server } = require("socket.io");
 
-    let myPersistentPlayerId = sessionStorage.getItem('unoPlayerId');
-    let isGameOver = false;
-    let countdownInterval = null;
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
 
-    // --- SCREEN & ELEMENT REFERENCES ---
-    const joinScreen = document.getElementById('join-screen');
-    const lobbyScreen = document.getElementById('lobby-screen');
-    const gameBoard = document.getElementById('game-board');
-    const playerNameInput = document.getElementById('player-name-input');
-    const joinGameBtn = document.getElementById('join-game-btn');
-    const playerList = document.getElementById('player-list');
-    const startGameBtn = document.getElementById('start-game-btn');
-    const hostMessage = document.getElementById('host-message');
-    const drawCardBtn = document.getElementById('drawCardBtn');
-    const unoBtn = document.getElementById('unoBtn');
-    const colorPickerModal = document.getElementById('color-picker-modal');
-    const drawnWildModal = document.getElementById('drawn-wild-modal');
-    const pickUntilModal = document.getElementById('pick-until-modal');
-    const swapModal = document.getElementById('swap-modal');
-    const endGameBtn = document.getElementById('endGameBtn');
-    const endOfRoundDiv = document.getElementById('end-of-round-div');
-    const nextRoundBtn = document.getElementById('next-round-btn');
-    const endGameRoundBtn = document.getElementById('end-game-round-btn');
-    const dealChoiceModal = document.getElementById('deal-choice-modal');
-    const dealCardsInput = document.getElementById('deal-cards-input');
-    const dealCardsBtn = document.getElementById('deal-cards-btn');
-    const unoAnnouncementOverlay = document.getElementById('uno-announcement-overlay');
-    const unoAnnouncementText = document.getElementById('uno-announcement-text');
-    const confirmEndGameModal = document.getElementById('confirm-end-game-modal');
-    const confirmEndYesBtn = document.getElementById('confirm-end-yes-btn');
-    const confirmEndNoBtn = document.getElementById('confirm-end-no-btn');
-    const finalScoreModal = document.getElementById('final-score-modal');
-    const finalWinnerMessage = document.getElementById('final-winner-message');
-    const finalScoreTableContainer = document.getElementById('final-score-table-container');
-    const finalScoreOkBtn = document.getElementById('final-score-ok-btn');
-    const invalidMoveCallout = document.getElementById('invalid-move-callout');
-    const gameLogList = document.getElementById('game-log-list');
-    const toastNotification = document.getElementById('toast-notification');
-    const actionBar = document.getElementById('action-bar');
-    const arrangeHandBtn = document.getElementById('arrangeHandBtn');
-    const hostRoundEndControls = document.getElementById('host-round-end-controls');
-    const nextRoundOkBtn = document.getElementById('next-round-ok-btn');
-    
-    // *** NEW: AFK Modal References ***
-    const afkNotificationModal = document.getElementById('afk-notification-modal');
-    const imBackBtn = document.getElementById('im-back-btn');
+app.use(express.static(path.join(__dirname, 'public')));
 
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
-    joinScreen.style.display = 'block';
-    lobbyScreen.style.display = 'none';
-    gameBoard.style.display = 'none';
+// --- SERVER-SIDE GAME STATE ---
+let players = []; // Lobby players { playerId, name, isHost }
+let gameState = null;
+let reconnectTimers = {}; // *** NEW: Stores individual timers { playerId: timeoutId }
+const DISCONNECT_GRACE_PERIOD = 60000; // *** NEW: 60 seconds
 
-    // --- DRAG AND DROP GLOBALS ---
-    let draggedCardElement = null;
-    let draggedCardIndex = -1;
+// --- GAME LOGIC FUNCTIONS (The Server's Brain) ---
 
-    // --- EVENT LISTENERS (Sending messages to server) ---
+// *** NEW: Helper to send log messages to all clients ***
+function addLog(message) {
+    if (io) {
+        io.emit('gameLog', message);
+    }
+}
 
-    joinGameBtn.addEventListener('click', () => {
-        const playerName = playerNameInput.value.trim();
-        if (playerName) {
-            socket.emit('joinGame', { playerName, playerId: myPersistentPlayerId });
-        } else {
-            alert('Please enter your name.');
-        }
-    });
+function createDeck() {
+    const deck = [];
+    const colors = ['Red', 'Green', 'Blue', 'Yellow'];
+    const values = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'Skip', 'Reverse', 'Draw Two'];
 
-    // *** NEW: Lobby Kick Button Listener ***
-    playerList.addEventListener('click', (event) => {
-        if (event.target.classList.contains('kick-btn')) {
-            const playerIdToKick = event.target.dataset.playerId;
-            socket.emit('kickPlayer', { playerIdToKick });
-        }
-    });
-
-    // *** NEW: In-Game AFK Button Listener ***
-    document.getElementById('left-column').addEventListener('click', (event) => {
-        if (event.target.classList.contains('mark-afk-btn')) {
-            const playerIdToMark = event.target.dataset.playerId;
-            socket.emit('markPlayerAFK', { playerIdToMark });
-        }
-    });
-
-    // *** NEW: "I'm Back" Button Listener ***
-    imBackBtn.addEventListener('click', () => {
-        socket.emit('playerIsBack');
-        afkNotificationModal.style.display = 'none';
-    });
-
-
-    startGameBtn.addEventListener('click', () => { socket.emit('startGame'); });
-    drawCardBtn.addEventListener('click', () => { socket.emit('drawCard'); });
-
-    endGameBtn.addEventListener('click', () => { confirmEndGameModal.style.display = 'flex'; });
-    endGameRoundBtn.addEventListener('click', () => { confirmEndGameModal.style.display = 'flex'; });
-    confirmEndNoBtn.addEventListener('click', () => { confirmEndGameModal.style.display = 'none'; });
-    confirmEndYesBtn.addEventListener('click', () => {
-        confirmEndGameModal.style.display = 'none';
-        socket.emit('endGame');
-    });
-
-    finalScoreOkBtn.addEventListener('click', () => {
-        isGameOver = false;
-        finalScoreModal.style.display = 'none';
-        gameBoard.style.display = 'none';
-        lobbyScreen.style.display = 'none';
-        joinScreen.style.display = 'block';
-        sessionStorage.clear(); // *** NEW: Clear session on final OK
-        myPersistentPlayerId = null;
-    });
-
-
-    unoBtn.addEventListener('click', () => {
-        socket.emit('callUno');
-        unoBtn.classList.add('pressed');
-        setTimeout(() => unoBtn.classList.remove('pressed'), 300);
-    });
-
-    nextRoundBtn.addEventListener('click', () => {
-        socket.emit('playerReadyForNextRound');
-        nextRoundBtn.disabled = true;
-        nextRoundBtn.textContent = 'Waiting...';
-    });
-
-    nextRoundOkBtn.addEventListener('click', () => {
-        socket.emit('playerReadyForNextRound');
-        endOfRoundDiv.style.display = 'none';
-    });
-
-
-    dealCardsBtn.addEventListener('click', () => {
-        const numCards = dealCardsInput.value;
-        socket.emit('dealChoice', { numCards });
-    });
-
-    colorPickerModal.addEventListener('click', (event) => {
-        if (event.target.matches('.color-btn')) {
-            const color = event.target.dataset.color;
-            socket.emit('colorChosen', { color });
-        }
-    });
-
-    drawnWildModal.addEventListener('click', (event) => {
-        const cardIndex = parseInt(drawnWildModal.dataset.cardIndex);
-        if (event.target.id === 'option-play-wild') {
-            socket.emit('choosePlayDrawnWild', { play: true, cardIndex });
-        } else if (event.target.id === 'option-keep-wild') {
-            socket.emit('choosePlayDrawnWild', { play: false, cardIndex });
-        }
-        drawnWildModal.style.display = 'none';
-    });
-
-    pickUntilModal.addEventListener('click', (event) => {
-        let choice = null;
-        if (event.target.id === 'option-pick-color') {
-            choice = 'pick-color';
-        } else if (event.target.id === 'option-discard-wilds') {
-            choice = 'discard-wilds';
-        }
-        if (choice) {
-            socket.emit('pickUntilChoice', { choice });
-        }
-        pickUntilModal.style.display = 'none';
-    });
-
-    swapModal.addEventListener('click', (event) => {
-        if (event.target.matches('.player-swap-btn')) {
-            const targetPlayerId = event.target.dataset.playerId;
-            socket.emit('swapHandsChoice', { targetPlayerId });
-            swapModal.style.display = 'none';
-        }
-    });
-
-    arrangeHandBtn.addEventListener('click', () => {
-        const myPlayer = window.gameState?.players.find(p => p.playerId === myPersistentPlayerId);
-        if (!myPlayer) return;
-
-        const colorOrder = { 'Black': 0, 'Blue': 1, 'Green': 2, 'Red': 3, 'Yellow': 4 };
-        const valueOrder = {
-            'Draw Two': 12, 'Skip': 11, 'Reverse': 10,
-            '9': 9, '8': 8, '7': 7, '6': 6, '5': 5, '4': 4, '3': 3, '2': 2, '1': 1, '0': 0,
-            'Wild': -1, 'Wild Draw Four': -1, 'Wild Pick Until': -1, 'Wild Swap': -1
-        };
-
-        const sortedHand = [...myPlayer.hand].sort((a, b) => {
-            const colorComparison = colorOrder[a.color] - colorOrder[b.color];
-            if (colorComparison !== 0) {
-                return colorComparison;
-            }
-            return valueOrder[b.value] - valueOrder[a.value];
-        });
-
-        myPlayer.hand = sortedHand;
-        socket.emit('rearrangeHand', { newHand: sortedHand });
-        displayGame(window.gameState);
-    });
-
-
-    // --- EVENT LISTENERS (Receiving messages from server) ---
-
-    socket.on('connect', () => {
-        console.log('Socket connected with ID:', socket.id);
-        if (myPersistentPlayerId) {
-            console.log('Attempting to rejoin with existing ID:', myPersistentPlayerId);
-            // *** Use 'joinGame' for all rejoining to unify logic ***
-            const playerName = playerNameInput.value.trim() || "Player";
-            socket.emit('joinGame', { playerName, playerId: myPersistentPlayerId });
-        }
-    });
-
-    socket.on('joinSuccess', ({ playerId, lobby }) => {
-        console.log('Successfully joined/registered with ID:', playerId);
-        myPersistentPlayerId = playerId;
-        sessionStorage.setItem('unoPlayerId', playerId);
-
-        renderLobby(lobby);
-    });
-
-    socket.on('lobbyUpdate', (players) => {
-        console.log('Received lobbyUpdate from server.');
-        if (isGameOver) return;
-        renderLobby(players);
-    });
-
-    socket.on('updateGameState', (gameState) => {
-        if (gameState.roundOver) {
-            displayGame(gameState);
-        } else {
-            joinScreen.style.display = 'none';
-            lobbyScreen.style.display = 'none';
-            endOfRoundDiv.style.display = 'none';
-            gameBoard.style.display = 'flex';
-            displayGame(gameState);
-        }
-    });
-
-    socket.on('roundOver', ({ winnerName, scores, finalGameState }) => {
-        displayGame(finalGameState);
-
-        document.getElementById('winner-message').textContent = `${winnerName} win(s) the round!`;
-
-        const scoresDisplay = document.getElementById('scores-display');
-        scoresDisplay.innerHTML = '<h3>Round Scores</h3>';
-        const scoreTable = document.createElement('table');
-        scoreTable.className = 'score-table';
-
-        let tableHTML = '<thead><tr><th>Player</th><th>Hand Score</th><th>Total Score</th></tr></thead><tbody>';
-
-        finalGameState.players.sort((a,b) => a.score - b.score).forEach(p => {
-             const roundScoreForPlayer = p.scoresByRound[p.scoresByRound.length - 1];
-             const isWinner = winnerName.includes(p.name);
-             tableHTML += `<tr class="${isWinner ? 'winner-row' : ''}"><td>${p.name}</td><td>${roundScoreForPlayer}</td><td>${p.score}</td></tr>`;
-        });
-        tableHTML += '</tbody>';
-        scoreTable.innerHTML = tableHTML;
-        scoresDisplay.appendChild(scoreTable);
-
-        const myPlayer = finalGameState.players.find(p => p.playerId === myPersistentPlayerId);
-
-        if (myPlayer && myPlayer.isHost) { // *** NEW: Added 'myPlayer' check
-            hostRoundEndControls.style.display = 'flex';
-            nextRoundOkBtn.style.display = 'none';
-            nextRoundBtn.disabled = false;
-            nextRoundBtn.textContent = 'Start Next Round';
-        } else {
-            hostRoundEndControls.style.display = 'none';
-            nextRoundOkBtn.style.display = 'block';
-        }
-
-        endOfRoundDiv.style.display = 'flex';
-    });
-
-    socket.on('finalGameOver', (finalGameState) => {
-        isGameOver = true;
-        gameBoard.style.display = 'none';
-        endOfRoundDiv.style.display = 'none';
-        renderFinalScores(finalGameState);
-        finalScoreModal.style.display = 'flex';
-    });
-
-
-    socket.on('drawnWildCard', ({ cardIndex, drawnCard }) => {
-        if (window.gameState) {
-            const myPlayer = window.gameState.players.find(p => p.playerId === myPersistentPlayerId);
-            if (myPlayer) {
-                myPlayer.hand.push(drawnCard);
-                displayGame(window.gameState);
+    for (const color of colors) {
+        deck.push({ color, value: '0' });
+        for (let i = 0; i < 2; i++) {
+            for (const value of values) {
+                deck.push({ color, value });
             }
         }
-        drawnWildModal.dataset.cardIndex = cardIndex;
-        drawnWildModal.style.display = 'flex';
-    });
-
-    socket.on('announce', (message) => {
-        showToast(message);
-    });
-
-    // *** NEW: Listener for AFK modal ***
-    socket.on('youWereMarkedAFK', () => {
-        afkNotificationModal.style.display = 'flex';
-    });
-
-
-    socket.on('playerDisconnected', ({ playerName }) => {
-        // This is now handled by the 'gameLog' and action bar
-        // showToast(`${playerName} disconnected. Game paused.`);
-    });
-    socket.on('playerReconnected', ({ playerName }) => {
-        // This is now handled by the 'gameLog'
-        // showToast(`${playerName} has reconnected!`);
-    });
-
-    socket.on('unoCalled', ({ playerName }) => {
-        showUnoAnnouncement(`${playerName} says UNO!`);
-    });
-
-    socket.on('gameLog', (message) => {
-        addMessageToGameLog(message);
-    });
-
-    socket.on('animateDraw', ({ playerId, count }) => {
-        animateCardDraw(playerId, count);
-    });
-
-    socket.on('animateSwap', ({ p1_id, p2_id }) => {
-        animateHandSwap(p1_id, p2_id);
-    });
-
-    socket.on('animatePlay', ({ playerId, card, cardIndex }) => {
-        animateCardPlay(playerId, card, cardIndex);
-    });
-
-
-    // --- ALL DISPLAY AND HELPER FUNCTIONS ---
-
-    function renderLobby(players) {
-        // *** NEW: Check if 'me' exists (i.e., not kicked) ***
-        const me = players.find(p => p.playerId === myPersistentPlayerId);
-        if (!me) {
-            // I have been kicked
-            showToast("You have been kicked from the lobby.");
-            sessionStorage.clear();
-            myPersistentPlayerId = null;
-            setTimeout(() => {
-                location.reload();
-            }, 1500);
-            return;
-        }
-
-        joinScreen.style.display = 'none';
-        lobbyScreen.style.display = 'block';
-        gameBoard.style.display = 'none';
-        endOfRoundDiv.style.display = 'none';
-        finalScoreModal.style.display = 'none';
-
-        playerList.innerHTML = '';
-        if (gameLogList) gameLogList.innerHTML = '';
-        
-        let amIHost = me.isHost; // Use 'me' to check host status
-
-        players.forEach(player => {
-            const playerItem = document.createElement('li');
-            
-            // Player name span
-            const nameSpan = document.createElement('span');
-            let content = player.name;
-            if (player.isHost) { content += ' 👑 (Host)'; }
-            if (player.playerId === myPersistentPlayerId) {
-                content += ' (You)';
-            }
-            nameSpan.textContent = content;
-            playerItem.appendChild(nameSpan);
-            
-            // *** NEW: Add Kick Button if Host ***
-            if (amIHost && player.playerId !== myPersistentPlayerId) {
-                const kickBtn = document.createElement('button');
-                kickBtn.className = 'kick-btn';
-                kickBtn.textContent = 'Kick';
-                kickBtn.dataset.playerId = player.playerId;
-                playerItem.appendChild(kickBtn);
-            }
-
-            playerList.appendChild(playerItem);
-        });
-
-        if (amIHost && players.length >= 2) {
-            startGameBtn.style.display = 'block';
-        } else {
-            startGameBtn.style.display = 'none';
-        }
-        hostMessage.style.display = amIHost ? 'none' : 'block';
     }
 
-
-    function showToast(message) {
-        if (!toastNotification) return;
-        toastNotification.textContent = message;
-        toastNotification.classList.add('show');
-        setTimeout(() => {
-            toastNotification.classList.remove('show');
-        }, 3000);
+    for (let i = 0; i < 4; i++) {
+        deck.push({ color: 'Black', value: 'Wild' });
+        deck.push({ color: 'Black', value: 'Wild Draw Four' });
+        deck.push({ color: 'Black', value: 'Wild Pick Until' });
     }
+    deck.push({ color: 'Black', value: 'Wild Swap' });
 
-    function showUnoAnnouncement(message) {
-        unoAnnouncementText.textContent = message;
-        unoAnnouncementOverlay.classList.add('show');
-        setTimeout(() => {
-            unoAnnouncementOverlay.classList.remove('show');
-        }, 1500);
-    }
+    return deck;
+}
 
-    function isClientMoveValid(playedCard, gameState) {
-        if (!gameState || !gameState.discardPile || gameState.discardPile.length === 0) return false;
-        const topCard = gameState.discardPile[0];
-        const activeColor = gameState.activeColor;
-        const drawPenalty = gameState.drawPenalty;
-
-        if (drawPenalty > 0) {
-            return playedCard.value === topCard.value;
-        }
-
-        if (playedCard.color === 'Black') return true;
-        if (playedCard.color === activeColor || playedCard.value === topCard.value) return true;
-        return false;
-    }
-
-    function triggerInvalidMoveFeedback(cardElement) {
-        cardElement.classList.add('invalid-shake');
-        const cardRect = cardElement.getBoundingClientRect();
-        const boardRect = gameBoard.getBoundingClientRect();
-        invalidMoveCallout.style.top = `${cardRect.top - boardRect.top - 40}px`; 
-        invalidMoveCallout.style.left = `${cardRect.left - boardRect.left + (cardRect.width / 2) - (invalidMoveCallout.offsetWidth / 2)}px`; 
-        invalidMoveCallout.classList.add('show');
-        setTimeout(() => {
-            cardElement.classList.remove('invalid-shake');
-        }, 500);
-        setTimeout(() => {
-            invalidMoveCallout.classList.remove('show');
-        }, 1500);
-    }
-
-    function animateCardPlay(playerId, card, cardIndex) {
-        const discardPileEl = document.querySelector('#discard-pile-dropzone .card');
-        const playerAreaEl = document.querySelector(`[data-player-id="${playerId}"]`);
-        if (!discardPileEl || !playerAreaEl) return;
-
-        const startRect = playerAreaEl.getBoundingClientRect();
-        const endRect = discardPileEl.getBoundingClientRect();
-        const boardRect = gameBoard.getBoundingClientRect();
-
-        const clone = createCardElement(card, -1);
-        clone.classList.add('flying-card');
-
-        clone.style.top = `${startRect.top - boardRect.top + (startRect.height / 2) - 60}px`;
-        clone.style.left = `${startRect.left - boardRect.left + (startRect.width / 2) - 40}px`;
-        clone.style.width = '80px';
-        clone.style.height = '120px';
-
-        if (playerId === myPersistentPlayerId && window.gameState) {
-             const myPlayer = window.gameState.players.find(p => p.playerId === myPersistentPlayerId);
-             if (myPlayer) {
-                const cardToHide = playerAreaEl.querySelector(`.card[data-card-index="${cardIndex}"]`);
-                if(cardToHide) cardToHide.style.visibility = 'hidden';
-             }
-        }
-
-        gameBoard.appendChild(clone);
-
-        requestAnimationFrame(() => {
-            clone.style.top = `${endRect.top - boardRect.top}px`;
-            clone.style.left = `${endRect.left - boardRect.left}px`;
-            clone.style.transform = `rotate(360deg)`;
-            clone.style.width = `${endRect.width}px`;
-            clone.style.height = `${endRect.height}px`;
-        });
-
-        setTimeout(() => {
-            clone.remove();
-        }, 800);
-    }
-
-    function animateCardDraw(playerId, count) {
-        const drawPileEl = document.querySelector('.piles-container .card-back');
-        const playerAreaEl = document.querySelector(`[data-player-id="${playerId}"] .card-container`);
-        if (!drawPileEl || !playerAreaEl) return;
-
-        const startRect = drawPileEl.getBoundingClientRect();
-        const endRect = playerAreaEl.getBoundingClientRect();
-        const boardRect = gameBoard.getBoundingClientRect();
-        const smallCardWidth = 80; 
-        const scaleFactor = smallCardWidth / startRect.width;
-
-        for (let i = 0; i < count; i++) {
-            const cardBack = document.createElement('div');
-            cardBack.className = 'card card-back flying-card';
-
-            cardBack.style.top = `${startRect.top - boardRect.top}px`;
-            cardBack.style.left = `${startRect.left - boardRect.top}px`;
-            cardBack.style.transform = 'scale(1.2)';
-            gameBoard.appendChild(cardBack);
-
-            setTimeout(() => {
-                requestAnimationFrame(() => {
-                    const top = `${endRect.top - boardRect.top + 10}px`;
-                    const left = `${endRect.left - boardRect.left + (i * 20)}px`;
-                    cardBack.style.transform = `scale(${scaleFactor})`;
-                    cardBack.style.top = top;
-                    cardBack.style.left = left;
-                });
-            }, i * 100);
-
-            setTimeout(() => {
-                cardBack.remove();
-            }, 800 + (i * 100));
-        }
-    }
-
-    function animateHandSwap(p1_id, p2_id) {
-        const p1_area = document.querySelector(`[data-player-id="${p1_id}"]`);
-        const p2_area = document.querySelector(`[data-player-id="${p2_id}"]`);
-        if (!p1_area || !p2_area) return;
-
-        const p1_cards = p1_area.querySelectorAll('.card-container .card');
-        const p2_cards = p2_area.querySelectorAll('.card-container .card');
-        const boardRect = gameBoard.getBoundingClientRect();
-
-        const animateHand = (cards, toArea) => {
-            const endRect = toArea.querySelector('.card-container').getBoundingClientRect();
-            const clones = [];
-
-            cards.forEach(card => {
-                const startRect = card.getBoundingClientRect();
-                const clone = card.cloneNode(true);
-                clone.classList.add('flying-card');
-                clone.style.top = `${startRect.top - boardRect.top}px`;
-                clone.style.left = `${startRect.left - boardRect.left}px`;
-                gameBoard.appendChild(clone);
-                clones.push(clone);
-                card.style.visibility = 'hidden';
-            });
-
-            clones.forEach((clone, i) => {
-                setTimeout(() => {
-                    requestAnimationFrame(() => {
-                        const top = `${endRect.top - boardRect.top + 10}px`;
-                        const left = `${endRect.left - boardRect.left + (i * 20)}px`;
-                        clone.style.top = top;
-                        clone.style.left = left;
-                    });
-                }, i * 50);
-                 setTimeout(() => clone.remove(), 800 + (i*50));
-            });
-        };
-
-        animateHand(p1_cards, p2_area);
-        animateHand(p2_cards, p1_area);
-    }
-
-    function addMessageToGameLog(message) {
-        if (!gameLogList) return;
-
-        const li = document.createElement('li');
-        li.textContent = message;
-        gameLogList.prepend(li);
-
-        while (gameLogList.children.length > 8) {
-            gameLogList.lastChild.remove();
-        }
-    }
-
-
-    function renderFinalScores(finalGameState) {
-        const players = finalGameState.players;
-        const numRounds = finalGameState.roundNumber;
-        const table = document.createElement('table');
-        table.className = 'score-table final-table';
-
-        let headerHtml = '<thead><tr><th>Round</th>';
-        players.forEach(p => { headerHtml += `<th>${p.name}</th>`; });
-        headerHtml += '</tr></thead>';
-
-        let bodyHtml = '<tbody>';
-        for (let i = 0; i < numRounds; i++) {
-            bodyHtml += `<tr><td>${i + 1}</td>`;
-            players.forEach(p => {
-                const score = p.scoresByRound[i] !== undefined ? p.scoresByRound[i] : '-';
-                bodyHtml += `<td>${score}</td>`;
-            });
-            bodyHtml += '</tr>';
-        }
-        bodyHtml += '</tbody>';
-
-        let footerHtml = '<tfoot><tr><td><strong>Total</strong></td>';
-        let lowestScore = Infinity;
-        players.forEach(p => {
-            if (p.score < lowestScore) {
-                lowestScore = p.score;
-            }
-            footerHtml += `<td><strong>${p.score}</strong></td>`;
-        });
-        footerHtml += '</tr></tfoot>';
-
-        table.innerHTML = headerHtml + bodyHtml + footerHtml;
-        finalScoreTableContainer.innerHTML = '';
-        finalScoreTableContainer.appendChild(table);
-
-        const winners = players.filter(p => p.score === lowestScore);
-        const winnerNames = winners.map(w => w.name).join(' and ');
-        finalWinnerMessage.textContent = `${winnerNames} win(s) the game!`;
-    }
-
-
-    function createCardElement(card, cardIndex) {
-        const cardDiv = document.createElement('div');
-        cardDiv.className = `card ${card.color}`;
-        cardDiv.dataset.cardIndex = cardIndex;
-
+function calculateScore(hand) {
+    let score = 0;
+    hand.forEach(card => {
         if (!isNaN(card.value)) {
-            const numberSpan = document.createElement('span');
-            numberSpan.className = 'number-circle';
-            numberSpan.textContent = card.value;
-            cardDiv.appendChild(numberSpan);
+            score += parseInt(card.value);
         } else {
-            const actionSpan = document.createElement('span');
-            actionSpan.className = 'action-text';
-            actionSpan.innerHTML = card.value.replace(/\s/g, '<br>');
-            cardDiv.appendChild(actionSpan);
+            switch(card.value) {
+                case 'Wild Swap':
+                    score += 100;
+                    break;
+                case 'Draw Two':
+                    score += 25;
+                    break;
+                case 'Skip':
+                case 'Reverse':
+                    score += 20;
+                    break;
+                default: // Catches all other Wild cards
+                    score += 50;
+                    break;
+            }
         }
-        return cardDiv;
+    });
+    return score;
+}
+
+function shuffleDeck(deck) {
+    for (let i = deck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+    return deck;
+}
+
+function setupGame(lobbyPlayers) {
+    const gamePlayers = lobbyPlayers.map(p => ({
+        playerId: p.playerId,
+        socketId: p.socketId,
+        name: p.name,
+        isHost: p.isHost,
+        score: 0,
+        hand: [],
+        unoState: 'safe',
+        scoresByRound: [],
+        status: 'Active' // <-- This is perfect
+    }));
+    return {
+        players: gamePlayers,
+        dealerIndex: -1,
+        numCardsToDeal: 7,
+        discardPile: [], // *** Will become array of {card, playerName} ***
+        drawPile: [],
+        gameWinner: null,
+        winnerOnHold: [],
+        roundNumber: 0,
+        isPaused: false, // *** RENAMED: from isSuspended
+        pauseInfo: { // *** NEW: Replaces suspensionInfo
+            pauseEndTime: null,
+            pausedForPlayerNames: []
+        },
+        readyForNextRound: [],
+    };
+}
+
+function startNewRound(gs) {
+    gs.roundNumber++;
+    const numPlayers = gs.players.length;
+
+    let roundDeck = shuffleDeck(createDeck());
+    gs.players.forEach(player => {
+        if (player.status === 'Active') { 
+            player.hand = roundDeck.splice(0, gs.numCardsToDeal);
+            player.unoState = 'safe';
+        } else {
+            player.hand = []; // Ensure non-active players have no cards
+        }
+    });
+
+    let topCard = roundDeck.shift();
+
+    while (topCard.value === 'Wild Draw Four' || topCard.value === 'Wild Swap') {
+        roundDeck.push(topCard);
+        roundDeck = shuffleDeck(roundDeck);
+        topCard = roundDeck.shift();
     }
 
-    function makeDraggable(element) {
-        let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
-        const header = element.querySelector('.modal-content h3, .modal-content h2, .modal-content p');
+    // *** MODIFIED: Discard pile is now an object ***
+    gs.discardPile = [{ card: topCard, playerName: 'Deck' }];
+    gs.drawPile = roundDeck;
+    gs.activeColor = topCard.color;
+    gs.playDirection = 1;
+    gs.drawPenalty = 0;
+    gs.needsColorChoice = null;
+    gs.needsPickUntilChoice = null;
+    gs.pickUntilState = null;
+    gs.needsSwapChoice = null;
+    gs.swapState = null;
+    gs.roundOver = false;
+    gs.needsDealChoice = null;
+    gs.winnerOnHold = [];
+    gs.isPaused = false; 
+    gs.pauseInfo = { pauseEndTime: null, pausedForPlayerNames: [] }; 
+    gs.readyForNextRound = [];
 
-        function dragMouseDown(e) {
-            e.preventDefault();
-            pos3 = e.clientX;
-            pos4 = e.clientY;
-            document.onmouseup = closeDragElement;
-            document.onmousemove = elementDrag;
+    const dealer = gs.players[gs.dealerIndex];
+    addLog(`Round ${gs.roundNumber} begins. ${dealer.name} deals ${gs.numCardsToDeal} cards.`);
+
+    let firstPlayerIndex = (gs.dealerIndex + 1) % numPlayers;
+    while (gs.players[firstPlayerIndex].status !== 'Active') {
+        firstPlayerIndex = (firstPlayerIndex + 1) % numPlayers;
+    }
+
+    if (topCard.color !== 'Black') {
+        const connectedPlayersCount = gs.players.filter(p => p.status === 'Active').length;
+
+        if (topCard.value === 'Reverse') {
+            if (connectedPlayersCount > 2) {
+                gs.playDirection = -1;
+                let tempIndex = gs.dealerIndex;
+                do {
+                    tempIndex = (tempIndex - 1 + numPlayers) % numPlayers;
+                } while (gs.players[tempIndex].status !== 'Active');
+                firstPlayerIndex = tempIndex;
+            } else { // 2-player reverse acts as a skip
+                let tempIndex = firstPlayerIndex;
+                do {
+                    tempIndex = (tempIndex + 1 + numPlayers) % numPlayers;
+                } while (gs.players[tempIndex].status !== 'Active');
+                firstPlayerIndex = tempIndex;
+            }
+        } else if (topCard.value === 'Skip') {
+            let tempIndex = firstPlayerIndex;
+            do {
+                tempIndex = (tempIndex + 1 + numPlayers) % numPlayers;
+            } while (gs.players[tempIndex].status !== 'Active');
+            firstPlayerIndex = tempIndex;
         }
-
-        function touchDown(e) {
-            pos3 = e.touches[0].clientX;
-            pos4 = e.touches[0].clientY;
-            document.ontouchend = closeDragElement;
-            document.ontouchmove = elementTouchDrag;
+        if (topCard.value === 'Draw Two') {
+            applyCardEffect(topCard);
         }
-
-        function elementDrag(e) {
-            e.preventDefault();
-            pos1 = pos3 - e.clientX;
-            pos2 = pos4 - e.clientY;
-            pos3 = e.clientX;
-            pos4 = e.clientY;
-            element.style.top = (element.offsetTop - pos2) + "px";
-            element.style.left = (element.offsetLeft - pos1) + "px";
-        }
-
-        function elementTouchDrag(e) {
-            e.preventDefault();
-            pos1 = pos3 - e.touches[0].clientX;
-            pos2 = pos4 - e.touches[0].clientY;
-            pos3 = e.touches[0].clientX;
-            pos4 = e.touches[0].clientY;
-            element.style.top = (element.offsetTop - pos2) + "px";
-            element.style.left = (element.offsetLeft - pos1) + "px";
-        }
-
-        function closeDragElement() {
-            document.onmouseup = null;
-            document.onmousemove = null;
-            document.ontouchend = null;
-            document.ontouchmove = null;
-        }
-
-        if (header) {
-            header.onmousedown = dragMouseDown;
-            header.ontouchstart = touchDown;
+    } else {
+        gs.needsColorChoice = dealer.playerId;
+        // *** MODIFIED: Update discard pile player name ***
+        gs.discardPile[0].playerName = dealer.name; 
+        if (topCard.value === 'Wild Pick Until') {
+            gs.needsPickUntilChoice = dealer.playerId;
         }
     }
 
+    gs.currentPlayerIndex = firstPlayerIndex;
 
-    function displayGame(gameState) {
-        window.gameState = gameState; 
+    return gs;
+}
 
-        if (countdownInterval) {
-            clearInterval(countdownInterval);
-            countdownInterval = null;
+
+function isMoveValid(playedCard, topCard, activeColor, drawPenalty) {
+    if (drawPenalty > 0) {
+        // *** MODIFIED: Check card value ***
+        return playedCard.value === topCard.value;
+    }
+    if (playedCard.color === 'Black') return true;
+    // *** MODIFIED: Check card value ***
+    if (playedCard.color === activeColor || playedCard.value === topCard.value) return true;
+    return false;
+}
+
+function advanceTurn() {
+    if (!gameState || gameState.roundOver) return;
+
+    const activePlayers = gameState.players.filter(p => p.status === 'Active');
+    if (activePlayers.length === 0) {
+        addLog("No active players left to advance turn.");
+        return; // No active players
+    }
+
+    const currentPlayer = gameState.players[gameState.currentPlayerIndex];
+    if (currentPlayer && currentPlayer.unoState === 'declared') {
+        currentPlayer.unoState = 'safe';
+    }
+
+    do {
+        const numPlayers = gameState.players.length;
+        gameState.currentPlayerIndex = (gameState.currentPlayerIndex + gameState.playDirection + numPlayers) % numPlayers;
+    } while (gameState.players[gameState.currentPlayerIndex].status !== 'Active');
+}
+
+function applyCardEffect(playedCard) {
+    const numPlayers = gameState.players.length;
+    switch(playedCard.value) {
+        case 'Reverse':
+            if (gameState.players.filter(p=>p.status === 'Active').length > 2) {
+                gameState.playDirection *= -1;
+            }
+            break;
+        case 'Draw Two':
+        case 'Wild Draw Four':
+            const penalty = (playedCard.value === 'Draw Two') ? 2 : 4;
+            gameState.drawPenalty += penalty;
+            break;
+    }
+}
+
+function handleEndOfRound(winners) {
+    if (gameState.roundOver) return;
+    gameState.roundOver = true;
+    gameState.readyForNextRound = []; // Reset readiness
+    const scoresForRound = [];
+
+    gameState.players.forEach(p => {
+        // Score 'Active' or 'Disconnected', not 'Removed'
+        const roundScore = (p.status === 'Active' || p.status === 'Disconnected') ? calculateScore(p.hand) : 0;
+        p.score += roundScore;
+        // Log score for 'Active' or 'Disconnected'
+        p.scoresByRound.push((p.status === 'Active' || p.status === 'Disconnected') ? roundScore : '-');
+        scoresForRound.push({ name: p.name, roundScore: roundScore, cumulativeScore: p.score });
+    });
+
+    const winnerNames = winners.map(w => w.name).join(' and ');
+    addLog(`🏁 ${winnerNames} wins the round!`);
+
+    // *** NEW: Emit winner announcement first ***
+    io.emit('announceRoundWinner', { winnerNames });
+
+    io.emit('roundOver', {
+        winnerName: winnerNames,
+        scores: scoresForRound,
+        finalGameState: gameState
+    });
+}
+
+
+function handleCardPlay(playerIndex, cardIndex) {
+    if (!gameState || playerIndex !== gameState.currentPlayerIndex || gameState.roundOver || gameState.isPaused) return;
+    const player = gameState.players[playerIndex];
+    if (!player || !player.hand[cardIndex]) return;
+
+    const playedCard = player.hand[cardIndex];
+    // *** MODIFIED: Get top card from object ***
+    const topCard = gameState.discardPile[0].card; 
+    const actionCardsThatDelayWin = ['Draw Two', 'Wild Draw Four', 'Wild Pick Until'];
+
+    if (isMoveValid(playedCard, topCard, gameState.activeColor, gameState.drawPenalty)) {
+        io.emit('animatePlay', { playerId: player.playerId, card: playedCard, cardIndex: cardIndex });
+
+        player.hand.splice(cardIndex, 1);
+
+        const cardName = `${playedCard.color !== 'Black' ? playedCard.color + ' ' : ''}${playedCard.value}`;
+        addLog(`› ${player.name} played a ${cardName}.`);
+
+        if (player.hand.length === 0) {
+            if (actionCardsThatDelayWin.includes(playedCard.value)) {
+                gameState.winnerOnHold.push(player.playerId);
+            } else {
+                handleEndOfRound([player]);
+                return;
+            }
         }
 
-        renderPlayers(gameState);
-        renderPiles(gameState);
+        if (player.hand.length === 1 && player.unoState !== 'declared') {
+            if (gameState.drawPile.length > 0) player.hand.push(gameState.drawPile.shift());
+            if (gameState.drawPile.length > 0) player.hand.push(gameState.drawPile.shift());
+            player.unoState = 'safe';
+            io.to(player.socketId).emit('announce', 'Penalty! You forgot to call UNO.');
+            addLog(` penalty on ${player.name} for not calling UNO.`);
+            io.emit('animateDraw', { playerId: player.playerId, count: 2 });
 
-        const myPlayer = gameState.players.find(p => p.playerId === myPersistentPlayerId);
-        if (!myPlayer) {
-            // Failsafe in case player is removed mid-game
-            showToast("You have been removed from the game.");
-            sessionStorage.clear();
-            setTimeout(() => location.reload(), 1500);
+
+        } else if (player.hand.length === 1 && player.unoState === 'declared') {
+            io.emit('unoCalled', { playerName: player.name });
+            player.unoState = 'safe';
+
+        } else if (player.hand.length > 1) {
+            player.unoState = 'safe';
+        }
+
+        // *** MODIFIED: Add object to discard pile ***
+        gameState.discardPile.unshift({ card: playedCard, playerName: player.name });
+
+        if (playedCard.value === 'Wild Pick Until') {
+            gameState.needsPickUntilChoice = player.playerId;
+            return;
+        } else if (playedCard.value === 'Wild Swap') {
+            gameState.swapState = { choosingPlayerId: player.playerId };
+            gameState.needsColorChoice = player.playerId;
             return;
         }
 
-        const isMyTurn = myPlayer && gameState.players[gameState.currentPlayerIndex]?.playerId === myPlayer.playerId;
-        const isPaused = gameState.isPaused; // *** RENAMED
-        const isHost = myPlayer.isHost;
+        applyCardEffect(playedCard);
 
-        endGameBtn.style.display = (isHost && !gameState.roundOver) ? 'block' : 'none';
-
-        // *** START: UPDATED ACTION BAR LOGIC ***
-        if (actionBar) {
-            if (isPaused && gameState.pauseInfo && gameState.pauseInfo.pauseEndTime) {
-                const { pauseEndTime, pausedForPlayerNames } = gameState.pauseInfo;
-                const names = pausedForPlayerNames.join(', ');
-
-                const updateTimer = () => {
-                    const remaining = Math.max(0, Math.floor((pauseEndTime - Date.now()) / 1000));
-                    actionBar.textContent = `Waiting ${remaining}s for ${names} to rejoin...`;
-                };
-                updateTimer();
-                countdownInterval = setInterval(updateTimer, 1000);
-
-            } else if (gameState.roundOver) {
-                const host = gameState.players.find(p => p.isHost);
-                const hostIsReady = gameState.readyForNextRound.includes(host?.playerId);
-                const connectedPlayers = gameState.players.filter(p => p.status === 'Active');
-                const allReady = gameState.readyForNextRound.length === connectedPlayers.length;
-
-                if (hostIsReady && !allReady) {
-                    const waitingOnPlayers = connectedPlayers.filter(p => !gameState.readyForNextRound.includes(p.playerId));
-                    const waitingOnNames = waitingOnPlayers.map(p => p.name).join(', ');
-                    actionBar.textContent = `Waiting for ${waitingOnNames} to click OK...`;
-                } else {
-                    actionBar.textContent = `Round Over! Waiting for players to start the next round.`;
-                }
-
-            } else if (gameState.needsDealChoice) {
-                const dealer = gameState.players.find(p => p.playerId === gameState.needsDealChoice);
-                actionBar.textContent = dealer ? `Waiting for ${dealer.name} to deal...` : 'Waiting for dealer...';
-            } else if (gameState.needsColorChoice) {
-                const chooser = gameState.players.find(p => p.playerId === gameState.needsColorChoice);
-                actionBar.textContent = chooser ? `${chooser.name} is choosing a color...` : 'Choosing a color...';
-            } else if (gameState.currentPlayerIndex !== undefined && gameState.players[gameState.currentPlayerIndex]) {
-                const currentPlayer = gameState.players[gameState.currentPlayerIndex];
-                if (currentPlayer.status === 'Active') {
-                    actionBar.textContent = `Waiting for ${currentPlayer.name} to play...`;
-                } else {
-                    // This state should be brief as the turn advances, but good to have
-                    actionBar.textContent = `Waiting for ${currentPlayer.name} to reconnect...`;
-                }
-            } else {
-                actionBar.textContent = "Game is starting...";
-            }
-        }
-        // *** END: UPDATED ACTION BAR LOGIC ***
-
-        if (gameState.roundOver && !gameState.readyForNextRound.includes(myPlayer.playerId)) {
-            endOfRoundDiv.style.display = 'flex';
+        if (playedCard.value === 'Skip' || (playedCard.value === 'Reverse' && gameState.players.filter(p=>p.status === 'Active').length === 2)) {
+            advanceTurn();
         }
 
-
-        if (unoBtn) {
-            if (gameState.activeColor && gameState.activeColor !== 'Black') {
-                const colorMap = { "Red": "#ff5555", "Green": "#55aa55", "Blue": "#5555ff", "Yellow": "#ffaa00" };
-                unoBtn.style.backgroundColor = colorMap[gameState.activeColor];
-            } else {
-                unoBtn.style.backgroundColor = '#333';
-            }
-            if (myPlayer && myPlayer.hand.length === 2 && !isPaused && !gameState.roundOver) {
-                unoBtn.disabled = false;
-                unoBtn.classList.add('uno-ready');
-            } else {
-                unoBtn.disabled = true;
-                unoBtn.classList.remove('uno-ready');
-            }
-        }
-
-        if (drawCardBtn) {
-            const currentPlayer = gameState.players[gameState.currentPlayerIndex];
-            if (currentPlayer) {
-                const pickUntilInfo = gameState.pickUntilState;
-                const isPickUntilActive = pickUntilInfo?.active && pickUntilInfo.targetPlayerIndex === gameState.currentPlayerIndex;
-                const firstName = currentPlayer.name.split(' ')[0];
-
-                if (isPickUntilActive) {
-                    drawCardBtn.textContent = `${firstName} PICKS FOR ${pickUntilInfo.targetColor.toUpperCase()}`;
-                } else if (gameState.drawPenalty > 0) {
-                    drawCardBtn.textContent = `${firstName} DRAWS ${gameState.drawPenalty}`;
-                } else {
-                    drawCardBtn.textContent = 'DRAW CARD';
-                }
-
-                drawCardBtn.disabled = !isMyTurn || isPaused || gameState.roundOver;
-            } else {
-                 drawCardBtn.textContent = 'DRAW CARD';
-                 drawCardBtn.disabled = true;
-            }
-        }
-
-        colorPickerModal.style.display = (gameState.needsColorChoice === myPersistentPlayerId && !isPaused) ? 'flex' : 'none';
-        pickUntilModal.style.display = (gameState.needsPickUntilChoice === myPersistentPlayerId && !isPaused) ? 'flex' : 'none';
-        dealChoiceModal.style.display = (gameState.needsDealChoice === myPersistentPlayerId && !isPaused) ? 'flex' : 'none';
-
-        if (gameState.needsSwapChoice === myPersistentPlayerId && !isPaused) {
-            const swapOptions = document.getElementById('swap-player-options');
-            swapOptions.innerHTML = '';
-            gameState.players.forEach(player => {
-                if (player.playerId !== myPersistentPlayerId && player.status === 'Active') {
-                    const button = document.createElement('button');
-                    button.textContent = player.name;
-                    button.className = 'player-swap-btn';
-                    button.dataset.playerId = player.playerId;
-                    swapOptions.appendChild(button);
-                }
-            });
-            swapModal.style.display = 'flex';
+        if (playedCard.color === 'Black') {
+            gameState.needsColorChoice = player.playerId;
         } else {
-            swapModal.style.display = 'none';
+            gameState.activeColor = playedCard.color;
+            advanceTurn();
         }
     }
+}
 
-    function renderPiles(gameState) {
-        const pilesArea = document.getElementById('piles-area');
-        pilesArea.innerHTML = '';
-        const pilesContainer = document.createElement('div');
-        pilesContainer.className = 'piles-container';
-        const drawPileWrapper = document.createElement('div');
-        drawPileWrapper.className = 'pile-wrapper';
-        const drawPileTitle = document.createElement('h4');
-        drawPileTitle.textContent = 'Draw Pile';
-        const drawCount = document.createElement('div');
-        drawCount.className = 'pile-count';
-        drawCount.textContent = `(${gameState.drawPile.length} Cards)`;
-        const cardBackElement = document.createElement('div');
-        cardBackElement.className = 'card card-back';
-        cardBackElement.innerHTML = 'U<br>N<br>O';
-        drawPileWrapper.appendChild(drawPileTitle);
-        drawPileWrapper.appendChild(drawCount);
-        drawPileWrapper.appendChild(cardBackElement);
-        const discardPileWrapper = document.createElement('div');
-        discardPileWrapper.className = 'pile-wrapper';
-        const discardPileTitle = document.createElement('h4');
-        discardPileTitle.textContent = 'Discard Pile';
-        const discardCount = document.createElement('div');
-        discardCount.className = 'pile-count';
-        discardCount.textContent = `(${gameState.discardPile.length} Cards)`;
-        const discardPileDiv = document.createElement('div');
-        discardPileDiv.id = 'discard-pile-dropzone';
-        const topCard = gameState.discardPile[0];
-        if (topCard) {
-            const topCardElement = createCardElement(topCard, -1);
-            discardPileDiv.appendChild(topCardElement);
+// *** (This function is unchanged) ***
+function handlePlayerRemoval(playerId) {
+    if (!gameState) return;
+    const player = gameState.players.find(p => p.playerId === playerId);
+
+    // Only remove if they are still 'Disconnected' (haven't rejoined)
+    if (player && player.status === 'Disconnected') {
+        player.status = 'Removed';
+        addLog(`Player ${player.name} failed to reconnect and has been removed.`);
+
+        // Clear their specific timer
+        if (reconnectTimers[playerId]) {
+            clearTimeout(reconnectTimers[playerId]);
+            delete reconnectTimers[playerId];
         }
-        discardPileWrapper.appendChild(discardPileTitle);
-        discardPileWrapper.appendChild(discardCount);
-        discardPileWrapper.appendChild(discardPileDiv);
-        pilesContainer.appendChild(drawPileWrapper);
-        pilesContainer.appendChild(discardPileWrapper);
-        pilesArea.appendChild(pilesContainer);
 
-        const dropZone = document.getElementById('discard-pile-dropzone');
-        dropZone.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            dropZone.classList.add('over');
-        });
-        dropZone.addEventListener('dragleave', () => {
-            dropZone.classList.remove('over');
-        });
-        dropZone.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dropZone.classList.remove('over');
-            if (draggedCardIndex !== -1) {
-                const myPlayer = gameState.players.find(p => p.playerId === myPersistentPlayerId);
-                const isMyTurn = myPlayer && gameState.players[gameState.currentPlayerIndex].playerId === myPlayer.playerId;
+        // Host migration
+        if (player.isHost) {
+            const nextActivePlayer = gameState.players.find(p => p.status === 'Active');
+            if (nextActivePlayer) {
+                nextActivePlayer.isHost = true;
+                addLog(`Host ${player.name} was removed. ${nextActivePlayer.name} is the new host.`);
+            } else {
+                addLog(`Host ${player.name} was removed. No active players left.`);
+            }
+        }
 
-                if(isMyTurn && !gameState.isPaused && !gameState.roundOver) { // *** RENAMED
-                    const playedCard = myPlayer.hand[draggedCardIndex];
-                    if (isClientMoveValid(playedCard, gameState)) {
-                        socket.emit('playCard', { cardIndex: draggedCardIndex });
-                    } else {
-                        if (draggedCardElement) {
-                            triggerInvalidMoveFeedback(draggedCardElement);
+        // Check if game should end
+        const activePlayers = gameState.players.filter(p => p.status === 'Active');
+        if (activePlayers.length < 2) {
+            addLog('Less than 2 active players remaining. Game over.');
+            io.emit('finalGameOver', gameState);
+            gameState = null; // End the game
+            reconnectTimers = {}; // Clear all timers
+            return;
+        }
+
+        // Unpause game if this was the last disconnected player
+        const remainingDisconnected = gameState.players.filter(p => p.status === 'Disconnected');
+        if (remainingDisconnected.length === 0) {
+            gameState.isPaused = false;
+            gameState.pauseInfo = { pauseEndTime: null, pausedForPlayerNames: [] };
+            addLog("All disconnected players have been handled. Game resumed.");
+        } else {
+            // Update pause info if others are still disconnected
+            gameState.pauseInfo.pausedForPlayerNames = remainingDisconnected.map(p => p.name);
+        }
+        
+        // Advance turn if it was the removed player's turn
+        if (!gameState.roundOver && gameState.players[gameState.currentPlayerIndex].playerId === playerId) {
+            addLog(`It was ${player.name}'s turn. Advancing to next active player.`);
+            advanceTurn();
+        }
+        
+        io.emit('updateGameState', gameState);
+
+    } else if (reconnectTimers[playerId]) {
+        // Clean up timer if player reconnected just as it fired
+        clearTimeout(reconnectTimers[playerId]);
+        delete reconnectTimers[playerId];
+    }
+}
+// *** (End of unchanged function) ***
+
+// --- SOCKET.IO LOGIC ---
+io.on('connection', (socket) => {
+  console.log(`Player connected: ${socket.id}`);
+
+  socket.on('joinGame', ({ playerName, playerId }) => {
+    if (gameState) {
+        let playerToRejoin = null;
+        if (playerId) {
+            // Allow 'Disconnected' or 'Removed' to rejoin
+            playerToRejoin = gameState.players.find(p => p.playerId === playerId && p.status !== 'Active');
+        }
+
+        // --- HYBRID RECONNECTION LOGIC (No changes needed) ---
+        if (!playerToRejoin) {
+            const disconnectedPlayers = gameState.players.filter(p => p.status !== 'Active');
+            const joiningPlayerNameLower = playerName.toLowerCase();
+
+            if (disconnectedPlayers.length === 1) {
+                playerToRejoin = disconnectedPlayers[0];
+            } else if (disconnectedPlayers.length > 1) {
+                let bestMatch = null;
+                let longestMatchLength = 0;
+                for (const p of disconnectedPlayers) {
+                    const disconnectedNameLower = p.name.toLowerCase();
+                    if (joiningPlayerNameLower.startsWith(disconnectedNameLower)) {
+                        if (disconnectedNameLower.length > longestMatchLength) {
+                            bestMatch = p;
+                            longestMatchLength = disconnectedNameLower.length;
                         }
                     }
                 }
+                playerToRejoin = bestMatch;
             }
-        });
+        }
+        // --- END OF LOGIC ---
+
+        if (playerToRejoin) {
+            console.log(`${playerName} is rejoining as ${playerToRejoin.name}.`);
+            
+            // *** START: RECONNECTION LOGIC (Unchanged) ***
+            playerToRejoin.status = 'Active'; 
+            playerToRejoin.socketId = socket.id;
+            playerToRejoin.name = playerName; // Update to latest name
+
+            // Clear the removal timer for this player
+            if (reconnectTimers[playerToRejoin.playerId]) {
+                clearTimeout(reconnectTimers[playerToRejoin.playerId]);
+                delete reconnectTimers[playerToRejoin.playerId];
+            }
+
+            addLog(`Player ${playerToRejoin.name} has reconnected!`);
+
+            // Check if we can unpause
+            const otherDisconnected = gameState.players.filter(p => p.status === 'Disconnected');
+            if (otherDisconnected.length === 0) {
+                gameState.isPaused = false;
+                gameState.pauseInfo = { pauseEndTime: null, pausedForPlayerNames: [] };
+                addLog("All players reconnected. Game resumed.");
+            } else {
+                // Update pause info
+                gameState.pauseInfo.pausedForPlayerNames = otherDisconnected.map(p => p.name);
+            }
+            // *** END: RECONNECTION LOGIC (Unchanged) ***
+
+            socket.emit('joinSuccess', { playerId: playerToRejoin.playerId, lobby: gameState.players });
+            io.emit('updateGameState', gameState);
+            return;
+        } else {
+            socket.emit('announce', 'Game is in progress. Cannot join now.');
+            return;
+        }
     }
 
-    function renderPlayers(gameState) {
-        const leftColumn = document.getElementById('left-column');
-        leftColumn.innerHTML = '';
-        const myPlayer = gameState.players.find(p => p.playerId === myPersistentPlayerId);
-        if (!myPlayer) return;
+    // --- LOBBY JOIN LOGIC (No changes needed) ---
+    let pId = playerId;
+    if (!pId) {
+        pId = Math.random().toString(36).substr(2, 9);
+    }
 
-        const isHost = myPlayer.isHost; // *** NEW: Get host status
+    const existingPlayer = players.find(p => p.playerId === pId);
+    if (existingPlayer) {
+        existingPlayer.socketId = socket.id;
+        existingPlayer.name = playerName;
+    } else {
+        const isHost = players.length === 0;
+        players.push({ playerId: pId, socketId: socket.id, name: playerName, isHost });
+    }
 
-        gameState.players.forEach((player, playerIndex) => {
-            const playerArea = document.createElement('div');
-            playerArea.className = 'player-area';
-            playerArea.dataset.playerId = player.playerId;
+    socket.emit('joinSuccess', { playerId: pId, lobby: players });
+    socket.broadcast.emit('lobbyUpdate', players);
+  });
 
-            if (player.status === 'Disconnected') {
-                playerArea.classList.add('disconnected');
-            } else if (player.status === 'Removed') {
-                playerArea.classList.add('disconnected', 'removed');
-            }
+  socket.on('rejoinGame', (playerId) => {
+    if (!gameState || !playerId) return;
 
-            const isCurrentPlayer = playerIndex === gameState.currentPlayerIndex;
-            const isDealerChoosing = player.playerId === gameState.needsDealChoice;
-            if ((isCurrentPlayer && player.status === 'Active' && !gameState.isPaused && !gameState.roundOver) || isDealerChoosing) { // *** RENAMED
-                playerArea.classList.add('active-player');
-            }
+    const playerToRejoin = gameState.players.find(p => p.playerId === playerId);
+    if (playerToRejoin && playerToRejoin.status !== 'Active') {
+        console.log(`${playerToRejoin.name} is rejoining the game.`);
+        playerToRejoin.status = 'Active'; 
+        playerToRejoin.socketId = socket.id;
+        
+        // *** START: RECONNECTION LOGIC (Unchanged) ***
+        if (reconnectTimers[playerToRejoin.playerId]) {
+            clearTimeout(reconnectTimers[playerToRejoin.playerId]);
+            delete reconnectTimers[playerToRejoin.playerId];
+        }
+        addLog(`Player ${playerToRejoin.name} has reconnected!`);
 
-            playerArea.classList.remove('uno-unsafe', 'uno-declared', 'has-uno');
-            if (player.unoState === 'unsafe') {
-                playerArea.classList.add('uno-unsafe');
-            } else if (player.unoState === 'declared' && player.playerId === myPersistentPlayerId) {
-                playerArea.classList.add('uno-declared');
-            }
-            if (player.hand.length === 1 && !gameState.roundOver) {
-                playerArea.classList.add('has-uno');
-            }
+        const otherDisconnected = gameState.players.filter(p => p.status === 'Disconnected');
+        if (otherDisconnected.length === 0) {
+            gameState.isPaused = false;
+            gameState.pauseInfo = { pauseEndTime: null, pausedForPlayerNames: [] };
+            addLog("All players reconnected. Game resumed.");
+        } else {
+            gameState.pauseInfo.pausedForPlayerNames = otherDisconnected.map(p => p.name);
+        }
+        // *** END: RECONNECTION LOGIC (Unchanged) ***
 
-            const playerInfo = document.createElement('div');
-            playerInfo.className = 'player-info';
-            
-            // Player name and info span
-            const nameSpan = document.createElement('span');
-            const hostIndicator = player.isHost ? '👑 ' : '';
-            nameSpan.innerHTML = `${hostIndicator}${player.name} (${player.hand.length} cards) <span class="player-score">Score: ${player.score}</span>`;
-            playerInfo.appendChild(nameSpan);
+        io.emit('updateGameState', gameState);
+    } else if (playerToRejoin && playerToRejoin.status === 'Active') {
+        playerToRejoin.socketId = socket.id;
+        socket.emit('updateGameState', gameState);
+    }
+  });
 
-            // *** NEW: Add AFK Button if Host ***
-            if (isHost && player.playerId !== myPersistentPlayerId && player.status === 'Active' && !gameState.roundOver) {
-                const afkBtn = document.createElement('button');
-                afkBtn.className = 'mark-afk-btn';
-                afkBtn.textContent = 'Mark AFK';
-                afkBtn.dataset.playerId = player.playerId;
-                playerInfo.appendChild(afkBtn);
-            }
+  socket.on('kickPlayer', ({ playerIdToKick }) => {
+    if (gameState) return;
+    const host = players.find(p => p.socketId === socket.id && p.isHost);
+    if (host) {
+        const playerToKick = players.find(p => p.playerId === playerIdToKick);
+        if (playerToKick) {
+            console.log(`Host ${host.name} kicked ${playerToKick.name}`);
+            players = players.filter(player => player.playerId !== playerIdToKick);
+            io.emit('lobbyUpdate', players);
+        }
+    }
+  });
 
-            playerArea.appendChild(playerInfo);
+  socket.on('startGame', () => {
+    const host = players.find(p => p.socketId === socket.id && p.isHost);
+    if (host && players.length >= 2) {
+      gameState = setupGame(players);
+      const newDealerIndex = (gameState.dealerIndex + 1) % gameState.players.length;
+      const dealer = gameState.players[newDealerIndex];
+      gameState.dealerIndex = newDealerIndex;
+      gameState.needsDealChoice = dealer.playerId;
+      io.emit('updateGameState', gameState);
+    }
+  });
 
-            const cardContainer = document.createElement('div');
-            cardContainer.className = 'card-container';
+  function checkAndStartNextRound() {
+    if (!gameState) return;
+    const host = gameState.players.find(p => p.isHost);
+    const connectedPlayers = gameState.players.filter(p => p.status === 'Active');
 
-            if (player.playerId === myPersistentPlayerId) {
-                const serverHand = window.gameState.players.find(p => p.playerId === myPersistentPlayerId).hand;
+    if (!host) return;
 
-                player.hand.forEach((card, clientIndex) => {
-                    const originalCardIndex = serverHand.findIndex((serverCard, serverIndex) => 
-                        serverCard.color === card.color && serverCard.value === card.value && !Array.from(cardContainer.children).some(el => parseInt(el.dataset.cardIndex) === serverIndex)
-                    );
+    const hostIsReady = gameState.readyForNextRound.includes(host.playerId);
+    const allPlayersReady = gameState.readyForNextRound.length === connectedPlayers.length;
 
-                    const cardEl = createCardElement(card, originalCardIndex);
+    if (hostIsReady && allPlayersReady) {
+        const newDealerIndex = (gameState.dealerIndex + 1) % gameState.players.length;
+        const dealer = gameState.players[newDealerIndex];
+        gameState.dealerIndex = newDealerIndex;
+        gameState.needsDealChoice = dealer.playerId;
+        io.emit('updateGameState', gameState);
+    }
+  }
 
-                    const isMyTurn = playerIndex === gameState.currentPlayerIndex;
-                    if (isMyTurn && !gameState.isPaused && !gameState.roundOver && player.status === 'Active') { // *** RENAMED
-                        cardEl.classList.add('clickable');
-                    }
+  socket.on('playerReadyForNextRound', () => {
+      if (!gameState) return;
+      const player = gameState.players.find(p => p.socketId === socket.id);
+      if (player && !gameState.readyForNextRound.includes(player.playerId)) {
+          gameState.readyForNextRound.push(player.playerId);
+          checkAndStartNextRound();
+          io.emit('updateGameState', gameState);
+      }
+  });
 
-                    cardEl.addEventListener('click', () => {
-                        if (isMyTurn && !gameState.isPaused && !gameState.roundOver && player.status === 'Active') { // *** RENAMED
-                            if (isClientMoveValid(card, gameState)) {
-                                socket.emit('playCard', { cardIndex: originalCardIndex });
-                            } else {
-                                triggerInvalidMoveFeedback(cardEl);
-                            }
-                        }
-                    });
 
-                    cardEl.draggable = !gameState.isPaused && !gameState.roundOver; // *** RENAMED
-                    cardContainer.appendChild(cardEl);
-                });
+  socket.on('dealChoice', ({ numCards }) => {
+    if (gameState.isPaused) return; 
+    const dealingPlayer = gameState.players.find(p => p.socketId === socket.id);
+      if (gameState && gameState.needsDealChoice === dealingPlayer?.playerId) {
+          const numToDeal = Math.max(1, Math.min(13, parseInt(numCards) || 7));
+          gameState.numCardsToDeal = numToDeal;
+          gameState = startNewRound(gameState);
+          io.emit('updateGameState', gameState);
+      }
+  });
 
-                cardContainer.addEventListener('dragstart', e => {
-                    if (gameState.isPaused || gameState.roundOver) { // *** RENAMED
-                        e.preventDefault();
+  socket.on('endGame', () => {
+      if(gameState) {
+          const player = gameState.players.find(p => p.socketId === socket.id);
+          if (player && player.isHost) {
+              io.emit('finalGameOver', gameState);
+              addLog(`The game has been ended by the host.`);
+              gameState = null;
+              players = [];
+              reconnectTimers = {};
+          }
+      }
+  });
+
+  socket.on('playCard', ({ cardIndex }) => {
+    if (!gameState || gameState.isPaused) return; 
+    const playerIndex = gameState.players.findIndex(p => p.socketId === socket.id);
+    if (playerIndex !== -1) {
+        handleCardPlay(playerIndex, cardIndex);
+        if (gameState && !gameState.roundOver) {
+             io.emit('updateGameState', gameState);
+        }
+    }
+  });
+
+  socket.on('callUno', () => {
+    if (!gameState || gameState.isPaused) return; 
+    const player = gameState.players.find(p => p.socketId === socket.id);
+    if (player && player.hand.length === 2) {
+        player.unoState = 'declared';
+        addLog(`📣 ${player.name} is ready to call UNO!`);
+    }
+  });
+
+
+  socket.on('drawCard', () => {
+    if (!gameState || gameState.roundOver || gameState.isPaused) return; 
+    const playerIndex = gameState.players.findIndex(p => p.socketId === socket.id);
+
+    if (playerIndex === gameState.currentPlayerIndex) {
+        const player = gameState.players[playerIndex];
+        // *** MODIFIED: Get top card from object ***
+        const topCard = gameState.discardPile[0].card;
+
+        if (gameState.pickUntilState?.active && gameState.pickUntilState.targetPlayerIndex === playerIndex) {
+            if (gameState.drawPile.length > 0) {
+                const drawnCard = gameState.drawPile.shift();
+                player.hand.push(drawnCard);
+                io.emit('animateDraw', { playerId: player.playerId, count: 1 });
+                addLog(`› ${player.name} is picking for a ${gameState.pickUntilState.targetColor}...`);
+                if (drawnCard.color === gameState.pickUntilState.targetColor) {
+                    player.hand.splice(player.hand.findIndex(c => c === drawnCard), 1);
+                    // *** MODIFIED: Add object to discard pile ***
+                    gameState.discardPile.unshift({ card: drawnCard, playerName: player.name });
+                    gameState.activeColor = drawnCard.color;
+                    io.to(socket.id).emit('announce', `You drew the target color (${drawnCard.value} ${drawnCard.color}) and it was played for you.`);
+                    addLog(`› ${player.name} found and played a ${drawnCard.color} card.`);
+
+                    applyCardEffect(drawnCard);
+
+                    if (player.hand.length === 0) {
+                        const heldWinners = gameState.players.filter(p => gameState.winnerOnHold.includes(p.playerId));
+                        handleEndOfRound([player, ...heldWinners]);
                         return;
                     }
-                    if (e.target.classList.contains('card')) {
-                       draggedCardElement = e.target;
-                       draggedCardIndex = parseInt(e.target.dataset.cardIndex);
-                       setTimeout(() => e.target.style.opacity = '0.5', 0);
-                    }
-                });
 
-                cardContainer.addEventListener('dragend', e => {
-                    if (e.target.classList.contains('card')) {
-                    e.target.classList.remove('dragging');
-                       setTimeout(() => {
-                            e.target.style.opacity = '1';
-                            const myCurrentPlayerState = window.gameState.players.find(p => p.playerId === myPersistentPlayerId);
-                            if (myCurrentPlayerState) {
-                                const newElements = [...cardContainer.querySelectorAll('.card')];
-                                const newIndices = newElements.map(el => parseInt(el.dataset.cardIndex));
-                                const serverHand = window.gameState.players.find(p => p.playerId === myPersistentPlayerId).hand;
-                                const reorderedHand = newIndices.map(originalIndex => serverHand[originalIndex]).filter(Boolean);
-
-                                if (reorderedHand.length === myPlayer.hand.length) {
-                                    socket.emit('rearrangeHand', { newHand: reorderedHand });
-                                    myPlayer.hand = reorderedHand;
-                                }
-                            }
-                            draggedCardElement = null;
-                            draggedCardIndex = -1;
-                       }, 0);
+                    if (gameState.winnerOnHold.length > 0) {
+                        const heldWinners = gameState.players.filter(p => gameState.winnerOnHold.includes(p.playerId));
+                        handleEndOfRound(heldWinners);
+                        return;
                     }
-                });
 
-                cardContainer.addEventListener('dragover', e => {
-                    e.preventDefault();
-                    if (gameState.isPaused || gameState.roundOver) return; // *** RENAMED
-                    const afterElement = getDragAfterElement(cardContainer, e.clientX);
-                    if (draggedCardElement) {
-                        if (afterElement == null) {
-                            cardContainer.appendChild(draggedCardElement);
-                        } else {
-                            cardContainer.insertBefore(draggedCardElement, afterElement);
-                        }
-                    }
-                });
+                    gameState.pickUntilState = null;
 
-            } else { 
-                if (gameState.roundOver && player.status === 'Active') {
-                    player.hand.forEach((card, cardIndex) => {
-                        const cardEl = createCardElement(card, cardIndex);
-                        cardContainer.appendChild(cardEl);
-                    });
-                } else {
-                    if (player.hand.length === 1) {
-                        const cardEl = document.createElement('div');
-                        cardEl.className = 'card uno-warning';
-                        const unoSpan = document.createElement('span');
-                        unoSpan.textContent = 'UNO';
-                        cardEl.appendChild(unoSpan);
-                        cardContainer.appendChild(cardEl);
-                    } else {
-                        for (let j = 0; j < player.hand.length; j++) {
-                            const cardEl = document.createElement('div');
-                            cardEl.className = 'card card-back';
-                            cardContainer.appendChild(cardEl);
-                        }
+                    if (drawnCard.value === 'Skip' || (drawnCard.value === 'Reverse' && gameState.players.filter(p=>p.status === 'Active').length === 2)) {
+                        advanceTurn();
                     }
+                    advanceTurn();
                 }
             }
-            playerArea.appendChild(cardContainer);
-            leftColumn.appendChild(playerArea);
-        });
-    }
-
-    function getDragAfterElement(container, x) {
-        const draggableElements = [...container.querySelectorAll('.card:not(.dragging)')];
-
-        return draggableElements.reduce((closest, child) => {
-            const box = child.getBoundingClientRect();
-            const offset = x - box.left - box.width / 2;
-            if (offset < 0 && offset > closest.offset) {
-                return { offset: offset, element: child };
-            } else {
-                return closest;
+        } else if (gameState.drawPenalty > 0) {
+            const penalty = gameState.drawPenalty;
+            for (let i = 0; i < penalty; i++) {
+                if (gameState.drawPile.length > 0) player.hand.push(gameState.drawPile.shift());
             }
-        }, { offset: Number.NEGATIVE_INFINITY }).element;
+            io.emit('animateDraw', { playerId: player.playerId, count: penalty });
+            addLog(`› ${player.name} drew ${penalty} cards.`);
+            player.unoState = 'safe';
+            gameState.drawPenalty = 0;
+
+            if (gameState.winnerOnHold.length > 0) {
+                const heldWinners = gameState.players.filter(p => gameState.winnerOnHold.includes(p.playerId));
+                if (!heldWinners.some(w => w.playerId === player.playerId)) {
+                    handleEndOfRound(heldWinners);
+                    return;
+                } else {
+                    gameState.winnerOnHold = [];
+                }
+            }
+
+            advanceTurn();
+        } else {
+            const hasPlayableColorCard = player.hand.some(card =>
+                card.color !== 'Black' && isMoveValid(card, topCard, gameState.activeColor, 0)
+            );
+            if (hasPlayableColorCard) {
+                io.to(socket.id).emit('announce', 'You have a playable color card and must play it.');
+                return;
+            }
+
+            if (gameState.drawPile.length > 0) {
+                const drawnCard = gameState.drawPile.shift();
+                io.emit('animateDraw', { playerId: player.playerId, count: 1 });
+                addLog(`› ${player.name} drew a card.`);
+                if (isMoveValid(drawnCard, topCard, gameState.activeColor, 0)) {
+                    if (drawnCard.color === 'Black') {
+                        player.hand.push(drawnCard);
+                        if (player.hand.length === 1) {
+                            player.unoState = 'declared';
+                            io.emit('unoCalled', { playerName: player.name });
+                        }
+                        const cardIndex = player.hand.length - 1;
+                        io.to(socket.id).emit('drawnWildCard', { cardIndex, drawnCard });
+                        return;
+                    } else {
+                        // *** MODIFIED: Add object to discard pile ***
+                        gameState.discardPile.unshift({ card: drawnCard, playerName: player.name });
+                        gameState.activeColor = drawnCard.color;
+                        applyCardEffect(drawnCard);
+                        io.to(socket.id).emit('announce', `You drew a playable card (${drawnCard.value} ${drawnCard.color}) and it was played for you.`);
+                        addLog(`...and it was a playable ${drawnCard.color} ${drawnCard.value}!`);
+                        if (player.hand.length === 1) {
+                            player.unoState = 'declared';
+                            io.emit('unoCalled', { playerName: player.name });
+                        }
+                        if (drawnCard.value === 'Skip' || (drawnCard.value === 'Reverse' && gameState.players.filter(p=>p.status === 'Active').length === 2)) {
+                            advanceTurn();
+                        }
+                        advanceTurn();
+                    }
+                } else {
+                    player.hand.push(drawnCard);
+                    player.unoState = 'safe';
+                    advanceTurn();
+                }
+            } else {
+                addLog(`Draw pile is empty! ${player.name} passes their turn.`);
+                advanceTurn();
+            }
+        }
+        io.emit('updateGameState', gameState);
     }
+  });
 
-    // --- Make modals draggable for both mouse and touch ---
-    makeDraggable(document.getElementById('color-picker-modal'));
-    makeDraggable(document.getElementById('drawn-wild-modal'));
-    makeDraggable(document.getElementById('pick-until-modal'));
-    makeDraggable(document.getElementById('swap-modal'));
-    makeDraggable(document.getElementById('deal-choice-modal'));
-    makeDraggable(document.getElementById('confirm-end-game-modal'));
-    makeDraggable(document.getElementById('end-of-round-div'));
-    makeDraggable(document.getElementById('final-score-modal'));
-    makeDraggable(document.getElementById('afk-notification-modal')); // *** NEW
+  socket.on('choosePlayDrawnWild', ({ play, cardIndex }) => {
+    if (!gameState || gameState.isPaused) return; 
+    const playerIndex = gameState.players.findIndex(p => p.socketId === socket.id);
+    if (play) {
+        const player = gameState.players[playerIndex];
+        if (player && player.hand.length === 2) {
+            player.unoState = 'declared';
+        }
+        handleCardPlay(playerIndex, cardIndex);
+    } else {
+        const player = gameState.players[playerIndex];
+        addLog(`› ${player.name} chose to keep the drawn Wild card.`);
+        advanceTurn();
+    }
+    if (gameState && !gameState.roundOver) {
+        io.emit('updateGameState', gameState);
+    }
+  });
 
+  socket.on('pickUntilChoice', ({ choice }) => {
+      if (!gameState || gameState.isPaused) return; 
+      const player = gameState.players.find(p => p.socketId === socket.id);
+      if (gameState.needsPickUntilChoice !== player.playerId) return;
+
+      const numPlayers = gameState.players.length;
+      const originalPlayerIndex = gameState.players.findIndex(p => p.socketId === socket.id);
+
+      if (choice === 'discard-wilds') {
+          addLog(`🌪️ Everyone else discards their Wild cards!`);
+          const winners = [];
+          gameState.players.forEach(p => {
+              if (p.socketId !== socket.id) {
+                  const originalHandSize = p.hand.length;
+                  if (originalHandSize > 0) {
+                      p.hand = p.hand.filter(card => card.color !== 'Black');
+                      if (p.hand.length === 0) {
+                          winners.push(p);
+                      }
+                      else if (p.hand.length === 1 && originalHandSize > 1) {
+                          p.unoState = 'declared';
+                          io.emit('unoCalled', { playerName: p.name });
+                      }
+                  }
+              }
+          });
+
+          if (winners.length > 0) {
+              const heldWinners = gameState.players.filter(p => gameState.winnerOnHold.includes(p.playerId));
+              handleEndOfRound([...winners, ...heldWinners]);
+              return;
+          }
+          if (gameState.winnerOnHold.length > 0) {
+              const heldWinners = gameState.players.filter(p => gameState.winnerOnHold.includes(p.playerId));
+              handleEndOfRound(heldWinners);
+              return;
+          }
+
+          gameState.needsColorChoice = player.playerId;
+
+      } else if (choice === 'pick-color') {
+          let nextPlayerIndex = (originalPlayerIndex + gameState.playDirection + numPlayers) % numPlayers;
+          let searchLimit = numPlayers; 
+          while (gameState.players[nextPlayerIndex].status !== 'Active' && searchLimit > 0) {
+              nextPlayerIndex = (nextPlayerIndex + gameState.playDirection + numPlayers) % numPlayers;
+              searchLimit--;
+          }
+          if (gameState.players[nextPlayerIndex].status === 'Active' && gameState.players[nextPlayerIndex].playerId !== player.playerId) {
+              gameState.pickUntilState = {
+                  targetPlayerIndex: nextPlayerIndex,
+                  active: false,
+                  targetColor: null
+              };
+              gameState.needsColorChoice = player.playerId;
+          } else {
+              addLog('No other connected players to target. Turn continues.');
+              gameState.needsColorChoice = player.playerId;
+          }
+      }
+      gameState.needsPickUntilChoice = null;
+      io.emit('updateGameState', gameState);
+  });
+
+  socket.on('swapHandsChoice', ({ targetPlayerId }) => {
+    if (!gameState || gameState.isPaused) return; 
+    const choosingPlayer = gameState.players.find(p => p.socketId === socket.id);
+    if (gameState.needsSwapChoice !== choosingPlayer.playerId) return;
+
+    const targetPlayer = gameState.players.find(p => p.playerId === targetPlayerId);
+    if (choosingPlayer && targetPlayer) {
+        io.emit('animateSwap', { p1_id: choosingPlayer.playerId, p2_id: targetPlayer.playerId });
+        [choosingPlayer.hand, targetPlayer.hand] = [targetPlayer.hand, choosingPlayer.hand];
+        addLog(`🤝 ${choosingPlayer.name} swapped hands with ${targetPlayer.name}!`);
+    }
+    gameState.needsSwapChoice = null;
+    gameState.swapState = null;
+    advanceTurn();
+    io.emit('updateGameState', gameState);
+  });
+
+  socket.on('colorChosen', ({ color }) => {
+    if (!gameState || gameState.isPaused) return; 
+    const choosingPlayer = gameState.players.find(p => p.socketId === socket.id);
+    if (gameState.needsColorChoice !== choosingPlayer.playerId) return;
+
+    addLog(`🎨 ${choosingPlayer.name} chose the color ${color}.`);
+
+    if (gameState.swapState) {
+        gameState.activeColor = color;
+        gameState.needsSwapChoice = gameState.swapState.choosingPlayerId;
+    } else if (gameState.pickUntilState) {
+        gameState.pickUntilState.active = true;
+        gameState.pickUntilState.targetColor = color;
+        gameState.activeColor = color;
+        gameState.currentPlayerIndex = gameState.pickUntilState.targetPlayerIndex;
+        const targetPlayer = gameState.players[gameState.pickUntilState.targetPlayerIndex];
+        addLog(`› ${targetPlayer.name} must now pick until they find a ${color} card!`);
+    } else {
+        gameState.activeColor = color;
+        const isDealerChoosingFirstCard = gameState.discardPile.length === 1 && gameState.players[gameState.dealerIndex].playerId === choosingPlayer.playerId;
+        if (!isDealerChoosingFirstCard) {
+            advanceTurn();
+        }
+    }
+    gameState.needsColorChoice = null;
+    io.emit('updateGameState', gameState);
+  });
+
+  socket.on('rearrangeHand', ({ newHand }) => {
+    if (!gameState) return;
+    const player = gameState.players.find(p => p.socketId === socket.id);
+    if (player) {
+        if (newHand.length === player.hand.length) {
+            player.hand = newHand;
+        }
+    }
+  });
+
+  socket.on('markPlayerAFK', ({ playerIdToMark }) => {
+    if (!gameState || gameState.isPaused) return; 
+
+    const host = gameState.players.find(p => p.socketId === socket.id && p.isHost);
+    const playerToMark = gameState.players.find(p => p.playerId === playerIdToMark);
+
+    if (host && playerToMark && playerToMark.status === 'Active') {
+        playerToMark.status = 'Disconnected';
+        addLog(`Host ${host.name} marked ${playerToMark.name} as AFK. The game is paused.`);
+
+        // Trigger pause
+        gameState.isPaused = true;
+        const pauseEndTime = Date.now() + DISCONNECT_GRACE_PERIOD;
+        
+        // Update pause info for all disconnected players
+        const allDisconnected = gameState.players.filter(p => p.status === 'Disconnected');
+        gameState.pauseInfo = {
+            pauseEndTime: pauseEndTime, // Set a new end time
+            pausedForPlayerNames: allDisconnected.map(p => p.name)
+        };
+        
+        // Start a removal timer for the marked player
+        if (reconnectTimers[playerToMark.playerId]) {
+            clearTimeout(reconnectTimers[playerToMark.playerId]);
+        }
+        reconnectTimers[playerToMark.playerId] = setTimeout(() => {
+            handlePlayerRemoval(playerToMark.playerId);
+        }, DISCONNECT_GRACE_PERIOD);
+
+        // Notify the marked player
+        io.to(playerToMark.socketId).emit('youWereMarkedAFK');
+        io.emit('updateGameState', gameState);
+    }
+  });
+
+  socket.on('playerIsBack', () => {
+    if (!gameState) return;
+    const player = gameState.players.find(p => p.socketId === socket.id);
+
+    if (player && player.status === 'Disconnected') {
+        player.status = 'Active';
+        addLog(`Player ${player.name} is back!`);
+
+        // Clear their removal timer
+        if (reconnectTimers[player.playerId]) {
+            clearTimeout(reconnectTimers[player.playerId]);
+            delete reconnectTimers[player.playerId];
+        }
+
+        // Check if we can unpause
+        const otherDisconnected = gameState.players.filter(p => p.status === 'Disconnected');
+        if (otherDisconnected.length === 0) {
+            gameState.isPaused = false;
+            gameState.pauseInfo = { pauseEndTime: null, pausedForPlayerNames: [] };
+            addLog("All players are back. Game resumed.");
+        } else {
+            // Update pause info
+            gameState.pauseInfo.pausedForPlayerNames = otherDisconnected.map(p => p.name);
+        }
+        
+        io.emit('updateGameState', gameState);
+    }
+  });
+
+
+  socket.on('disconnect', () => {
+    console.log(`Player disconnected: ${socket.id}`);
+
+    if (gameState) {
+        const disconnectedPlayer = gameState.players.find(p => p.socketId === socket.id);
+        
+        if (disconnectedPlayer && disconnectedPlayer.status === 'Active') {
+            disconnectedPlayer.status = 'Disconnected';
+            addLog(`Player ${disconnectedPlayer.name} has disconnected. The game is paused.`);
+
+            // Trigger pause
+            gameState.isPaused = true;
+            const pauseEndTime = Date.now() + DISCONNECT_GRACE_PERIOD;
+            
+            // Update pause info for all disconnected players
+            const allDisconnected = gameState.players.filter(p => p.status === 'Disconnected');
+            gameState.pauseInfo = {
+                pauseEndTime: pauseEndTime, // Set a new end time
+                pausedForPlayerNames: allDisconnected.map(p => p.name)
+            };
+
+            // Start a removal timer for this player
+            if (reconnectTimers[disconnectedPlayer.playerId]) {
+                clearTimeout(reconnectTimers[disconnectedPlayer.playerId]);
+            }
+            reconnectTimers[disconnectedPlayer.playerId] = setTimeout(() => {
+                handlePlayerRemoval(disconnectedPlayer.playerId);
+            }, DISCONNECT_GRACE_PERIOD);
+
+            io.emit('updateGameState', gameState);
+        }
+    } else {
+        // Player was in lobby
+        const playerInLobby = players.find(player => player.socketId === socket.id);
+        if (playerInLobby) {
+            players = players.filter(player => player.socketId !== socket.id);
+            // Handle host leaving lobby
+            if (playerInLobby.isHost && players.length > 0) {
+                players[0].isHost = true;
+            }
+            io.emit('lobbyUpdate', players);
+        }
+    }
+  });
+});
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`✅ UNO Server is live and listening on port ${PORT}`);
 });

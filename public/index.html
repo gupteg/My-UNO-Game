@@ -34,6 +34,7 @@
                 <button id="drawCardBtn">DRAW CARD</button>
                 <button id="unoBtn">UNO</button>
                 <button id="arrangeHandBtn">Arrange My Hand</button>
+                <button id="showDiscardPileBtn">DISCARD PILE</button>
                 <button id="endGameBtn" style="display: none;">END GAME</button>
             </div>
             <div id="game-log-container">
@@ -81,6 +82,17 @@
             </div>
         </div>
     </div>
+
+    <div id="discard-pile-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3>Discard Pile (Last 10)</h3>
+            <p>(Newest on top)</p>
+            <div id="discard-pile-list">
+                </div>
+        </div>
+    </div>
+
+
     <script src="/socket.io/socket.io.js"></script>
     <script src="game.js"></script>
 
