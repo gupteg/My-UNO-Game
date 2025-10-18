@@ -681,7 +681,7 @@ body {
 }
 .score-table tr.winner-row td {
     background-color: #fffbe6;
-    color: #997400;
+    color: #997000;
     font-weight: bold;
 }
 
@@ -777,8 +777,9 @@ body {
 @media (max-width: 768px) {
     body {
         padding: 5px;
+        /* --- MODIFIED AS REQUESTED --- */
         /* Increased padding for more scroll space below fixed buttons */
-        padding-bottom: 150px;
+        padding-bottom: 240px;
         overflow-y: auto;
         overflow-x: hidden;
     }
@@ -803,8 +804,8 @@ body {
         gap: 15px;
         padding: 5px 0;
         overflow-y: visible; /* Rely on body scroll */
-        /* *** INCREASED MARGIN FOR LOG VISIBILITY *** */
-        margin-bottom: 120px; /* Increased buffer */
+        /* --- MODIFIED AS REQUESTED --- */
+        /* Removed redundant margin-bottom: 120px; */
     }
 
     .player-area {
@@ -854,7 +855,7 @@ body {
     #game-log-container {
         width: 100%;
         /* Add some padding so the last log isn't right at the bottom edge */
-        padding-bottom: 150px; /* <--- MODIFIED AS REQUESTED */
+        padding-bottom: 10px;
     }
 
     .card {
