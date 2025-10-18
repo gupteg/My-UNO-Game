@@ -4,6 +4,11 @@ window.addEventListener('DOMContentLoaded', () => {
     let myPersistentPlayerId = sessionStorage.getItem('unoPlayerId');
     let isGameOver = false;
     let countdownInterval = null;
+    
+    // --- START PHASE 2: Temp state for modals ---
+    let playerIdToKick = null;
+    let playerIdToMarkAFK = null;
+    // --- END PHASE 2 ---
 
     // --- SCREEN & ELEMENT REFERENCES ---
     const joinScreen = document.getElementById('join-screen');
@@ -43,6 +48,17 @@ window.addEventListener('DOMContentLoaded', () => {
     const arrangeHandBtn = document.getElementById('arrangeHandBtn');
     const hostRoundEndControls = document.getElementById('host-round-end-controls');
     const nextRoundOkBtn = document.getElementById('next-round-ok-btn');
+
+    // --- START PHASE 2: New Modal Element Refs ---
+    const confirmKickModal = document.getElementById('confirm-kick-modal');
+    const confirmKickMessage = document.getElementById('confirm-kick-message');
+    const confirmKickYesBtn = document.getElementById('confirm-kick-yes-btn');
+    const confirmKickNoBtn = document.getElementById('confirm-kick-no-btn');
+    const confirmAfkModal = document.getElementById('confirm-afk-modal');
+    const confirmAfkMessage = document.getElementById('confirm-afk-message');
+    const confirmAfkYesBtn = document.getElementById('confirm-afk-yes-btn');
+    const confirmAfkNoBtn = document.getElementById('confirm-afk-no-btn');
+    // --- END PHASE 2 ---
 
 
     joinScreen.style.display = 'block';
@@ -169,6 +185,32 @@ window.addEventListener('DOMContentLoaded', () => {
         displayGame(window.gameState);
     });
 
+    // --- START PHASE 2: New Modal Button Listeners ---
+    confirmKickYesBtn.addEventListener('click', () => {
+        if (playerIdToKick) {
+            socket.emit('kickPlayer', { playerId: playerIdToKick });
+        }
+        confirmKickModal.style.display = 'none';
+        playerIdToKick = null;
+    });
+    confirmKickNoBtn.addEventListener('click', () => {
+        confirmKickModal.style.display = 'none';
+        playerIdToKick = null;
+    });
+
+    confirmAfkYesBtn.addEventListener('click', () => {
+        if (playerIdToMarkAFK) {
+            socket.emit('markPlayerAFK', { playerId: playerIdToMarkAFK });
+        }
+        confirmAfkModal.style.display = 'none';
+        playerIdToMarkAFK = null;
+    });
+    confirmAfkNoBtn.addEventListener('click', () => {
+        confirmAfkModal.style.display = 'none';
+        playerIdToMarkAFK = null;
+    });
+    // --- END PHASE 2 ---
+
 
     // --- EVENT LISTENERS (Receiving messages from server) ---
 
@@ -193,6 +235,15 @@ window.addEventListener('DOMContentLoaded', () => {
         if (isGameOver) return;
         renderLobby(players);
     });
+    
+    // --- START PHASE 2: Kicked from Lobby Handler ---
+    socket.on('kicked', () => {
+        alert('You have been kicked from the lobby by the host.');
+        sessionStorage.removeItem('unoPlayerId'); // Clear session
+        // Force a reload to go back to join screen
+        window.location.reload();
+    });
+    // --- END PHASE 2 ---
 
     socket.on('updateGameState', (gameState) => {
         if (gameState.roundOver) {
@@ -309,13 +360,31 @@ window.addEventListener('DOMContentLoaded', () => {
         let amIHost = false;
         players.forEach(player => {
             const playerItem = document.createElement('li');
+            const playerNameSpan = document.createElement('span');
+            
             let content = player.name;
             if (player.isHost) { content += ' 👑 (Host)'; }
             if (player.playerId === myPersistentPlayerId) {
                 content += ' (You)';
                 amIHost = player.isHost;
             }
-            playerItem.textContent = content;
+            playerNameSpan.textContent = content;
+            playerItem.appendChild(playerNameSpan);
+            
+            // --- START PHASE 2: Add Kick Button ---
+            if (amIHost && player.playerId !== myPersistentPlayerId) {
+                const kickBtn = document.createElement('button');
+                kickBtn.textContent = 'Kick';
+                kickBtn.className = 'host-control-btn';
+                kickBtn.addEventListener('click', () => {
+                    playerIdToKick = player.playerId;
+                    confirmKickMessage.textContent = `Are you sure you want to kick ${player.name} from the lobby?`;
+                    confirmKickModal.style.display = 'flex';
+                });
+                playerItem.appendChild(kickBtn);
+            }
+            // --- END PHASE 2 ---
+
             playerList.appendChild(playerItem);
         });
 
@@ -865,6 +934,20 @@ window.addEventListener('DOMContentLoaded', () => {
             const hostIndicator = player.isHost ? '👑 ' : '';
             playerInfo.innerHTML = `${hostIndicator}${player.name} (${player.hand.length} cards) <span class="player-score">Score: ${player.score}</span>`;
             playerArea.appendChild(playerInfo);
+            
+            // --- START PHASE 2: Add AFK Button ---
+            if (myPlayer.isHost && player.playerId !== myPersistentPlayerId && player.status === 'Active' && !gameState.roundOver) {
+                const afkBtn = document.createElement('button');
+                afkBtn.textContent = 'AFK';
+                afkBtn.className = 'host-control-btn';
+                afkBtn.addEventListener('click', () => {
+                    playerIdToMarkAFK = player.playerId;
+                    confirmAfkMessage.textContent = `Are you sure you want to mark ${player.name} as AFK? This will pause the game for 60 seconds.`;
+                    confirmAfkModal.style.display = 'flex';
+                });
+                playerArea.appendChild(afkBtn);
+            }
+            // --- END PHASE 2 ---
 
             const cardContainer = document.createElement('div');
             cardContainer.className = 'card-container';
@@ -950,7 +1033,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
             } else { 
                 // <-- PHASE 1 CHANGE: Check status
-                if (gameState.roundOver && player.status === 'Active') {
+                if (gameState.roundOver && (player.status === 'Active' || player.status === 'Disconnected')) {
                     player.hand.forEach((card, cardIndex) => {
                         const cardEl = createCardElement(card, cardIndex);
                         cardContainer.appendChild(cardEl);
@@ -1000,5 +1083,9 @@ window.addEventListener('DOMContentLoaded', () => {
     makeDraggable(document.getElementById('confirm-end-game-modal'));
     makeDraggable(document.getElementById('end-of-round-div'));
     makeDraggable(document.getElementById('final-score-modal'));
+    // --- START PHASE 2: Make new modals draggable ---
+    makeDraggable(document.getElementById('confirm-kick-modal'));
+    makeDraggable(document.getElementById('confirm-afk-modal'));
+    // --- END PHASE 2 ---
 
 });

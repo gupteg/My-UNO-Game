@@ -57,6 +57,11 @@ body {
   font-size: 1.1em;
   font-weight: bold;
   color: #444;
+  /* START PHASE 2: Make room for kick button */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  /* END PHASE 2 */
 }
 
 #host-message {
@@ -118,6 +123,9 @@ body {
   border-radius: 10px;
   background-color: rgba(0,0,0,0.1);
   transition: all 0.3s ease;
+  /* START PHASE 2: Make room for AFK button */
+  position: relative;
+  /* END PHASE 2 */
 }
 
 .player-area.active-player {
@@ -133,6 +141,9 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  /* START PHASE 2: Ensure info doesn't overlap button */
+  padding-right: 50px;
+  /* END PHASE 2 */
 }
 
 .player-score {
@@ -631,11 +642,18 @@ body {
     color: white;
 }
 
-#end-game-round-btn, #confirm-end-no-btn {
+#end-game-round-btn, #confirm-end-no-btn, #confirm-kick-yes-btn, #confirm-afk-yes-btn {
     background-color: #ff5555;
     border-color: #cc4444;
     color: white;
 }
+/* START PHASE 2: Make 'No' buttons neutral */
+#confirm-kick-no-btn, #confirm-afk-no-btn {
+    background-color: #f0f0f0;
+    border-color: #ccc;
+    color: #333;
+}
+/* END PHASE 2 */
 
 .score-table {
     color: #333;
@@ -678,7 +696,6 @@ body {
     box-shadow: none !important;
 }
 
-/* <-- START PHASE 1 CHANGE: New 'Removed' styles --> */
 .player-area.disconnected:not(.removed) .player-info::after {
     content: '(Disconnected)';
     font-style: italic;
@@ -699,8 +716,33 @@ body {
     opacity: 0.4;
     border-style: dashed;
 }
-/* <-- END PHASE 1 CHANGE --> */
 
+/* START PHASE 2: Host Control Button Styles */
+.host-control-btn {
+    padding: 3px 8px;
+    font-size: 12px;
+    background-color: #c82333;
+    border: 1px solid #b21f2d;
+    color: white;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-left: 10px;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+}
+.host-control-btn:hover {
+    background-color: #e0293d;
+    transform: scale(1.05);
+}
+
+.player-area .host-control-btn {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    font-size: 11px;
+    padding: 4px 6px;
+}
+/* END PHASE 2 */
 
 /* Responsive Layout for Mobile Devices */
 @media (max-width: 768px) {
@@ -738,6 +780,16 @@ body {
         width: 100%;
         box-sizing: border-box;
     }
+    
+    /* START PHASE 2: Adjust player info for mobile AFK button */
+    .player-info {
+        padding-right: 45px;
+    }
+    .player-area .host-control-btn {
+        top: 6px;
+        right: 8px;
+    }
+    /* END PHASE 2 */
 
     #piles-area .card {
         width: 100px;
