@@ -102,7 +102,7 @@ function setupGame(lobbyPlayers) {
         players: gamePlayers,
         dealerIndex: -1,
         numCardsToDeal: 7,
-        discardPile: [],
+        discardPile: [], // *** Will become array of {card, playerName} ***
         drawPile: [],
         gameWinner: null,
         winnerOnHold: [],
@@ -138,7 +138,8 @@ function startNewRound(gs) {
         topCard = roundDeck.shift();
     }
 
-    gs.discardPile = [topCard];
+    // *** MODIFIED: Discard pile is now an object ***
+    gs.discardPile = [{ card: topCard, playerName: 'Deck' }];
     gs.drawPile = roundDeck;
     gs.activeColor = topCard.color;
     gs.playDirection = 1;
@@ -151,8 +152,8 @@ function startNewRound(gs) {
     gs.roundOver = false;
     gs.needsDealChoice = null;
     gs.winnerOnHold = [];
-    gs.isPaused = false; // *** RENAMED: from isSuspended
-    gs.pauseInfo = { pauseEndTime: null, pausedForPlayerNames: [] }; // *** NEW
+    gs.isPaused = false; 
+    gs.pauseInfo = { pauseEndTime: null, pausedForPlayerNames: [] }; 
     gs.readyForNextRound = [];
 
     const dealer = gs.players[gs.dealerIndex];
@@ -193,6 +194,8 @@ function startNewRound(gs) {
         }
     } else {
         gs.needsColorChoice = dealer.playerId;
+        // *** MODIFIED: Update discard pile player name ***
+        gs.discardPile[0].playerName = dealer.name; 
         if (topCard.value === 'Wild Pick Until') {
             gs.needsPickUntilChoice = dealer.playerId;
         }
@@ -206,9 +209,11 @@ function startNewRound(gs) {
 
 function isMoveValid(playedCard, topCard, activeColor, drawPenalty) {
     if (drawPenalty > 0) {
+        // *** MODIFIED: Check card value ***
         return playedCard.value === topCard.value;
     }
     if (playedCard.color === 'Black') return true;
+    // *** MODIFIED: Check card value ***
     if (playedCard.color === activeColor || playedCard.value === topCard.value) return true;
     return false;
 }
@@ -267,6 +272,9 @@ function handleEndOfRound(winners) {
     const winnerNames = winners.map(w => w.name).join(' and ');
     addLog(`🏁 ${winnerNames} wins the round!`);
 
+    // *** NEW: Emit winner announcement first ***
+    io.emit('announceRoundWinner', { winnerNames });
+
     io.emit('roundOver', {
         winnerName: winnerNames,
         scores: scoresForRound,
@@ -276,13 +284,13 @@ function handleEndOfRound(winners) {
 
 
 function handleCardPlay(playerIndex, cardIndex) {
-    // *** RENAMED: isSuspended to isPaused
     if (!gameState || playerIndex !== gameState.currentPlayerIndex || gameState.roundOver || gameState.isPaused) return;
     const player = gameState.players[playerIndex];
     if (!player || !player.hand[cardIndex]) return;
 
     const playedCard = player.hand[cardIndex];
-    const topCard = gameState.discardPile[0];
+    // *** MODIFIED: Get top card from object ***
+    const topCard = gameState.discardPile[0].card; 
     const actionCardsThatDelayWin = ['Draw Two', 'Wild Draw Four', 'Wild Pick Until'];
 
     if (isMoveValid(playedCard, topCard, gameState.activeColor, gameState.drawPenalty)) {
@@ -319,8 +327,8 @@ function handleCardPlay(playerIndex, cardIndex) {
             player.unoState = 'safe';
         }
 
-
-        gameState.discardPile.unshift(playedCard);
+        // *** MODIFIED: Add object to discard pile ***
+        gameState.discardPile.unshift({ card: playedCard, playerName: player.name });
 
         if (playedCard.value === 'Wild Pick Until') {
             gameState.needsPickUntilChoice = player.playerId;
@@ -346,7 +354,7 @@ function handleCardPlay(playerIndex, cardIndex) {
     }
 }
 
-// *** START: NEW PLAYER REMOVAL FUNCTION ***
+// *** (This function is unchanged) ***
 function handlePlayerRemoval(playerId) {
     if (!gameState) return;
     const player = gameState.players.find(p => p.playerId === playerId);
@@ -408,7 +416,7 @@ function handlePlayerRemoval(playerId) {
         delete reconnectTimers[playerId];
     }
 }
-// *** END: NEW PLAYER REMOVAL FUNCTION ***
+// *** (End of unchanged function) ***
 
 // --- SOCKET.IO LOGIC ---
 io.on('connection', (socket) => {
@@ -449,7 +457,7 @@ io.on('connection', (socket) => {
         if (playerToRejoin) {
             console.log(`${playerName} is rejoining as ${playerToRejoin.name}.`);
             
-            // *** START: RECONNECTION LOGIC ***
+            // *** START: RECONNECTION LOGIC (Unchanged) ***
             playerToRejoin.status = 'Active'; 
             playerToRejoin.socketId = socket.id;
             playerToRejoin.name = playerName; // Update to latest name
@@ -472,7 +480,7 @@ io.on('connection', (socket) => {
                 // Update pause info
                 gameState.pauseInfo.pausedForPlayerNames = otherDisconnected.map(p => p.name);
             }
-            // *** END: RECONNECTION LOGIC ***
+            // *** END: RECONNECTION LOGIC (Unchanged) ***
 
             socket.emit('joinSuccess', { playerId: playerToRejoin.playerId, lobby: gameState.players });
             io.emit('updateGameState', gameState);
@@ -502,7 +510,6 @@ io.on('connection', (socket) => {
     socket.broadcast.emit('lobbyUpdate', players);
   });
 
-  // *** This handler is now partially redundant due to 'joinGame', but we'll keep its logic for safety ***
   socket.on('rejoinGame', (playerId) => {
     if (!gameState || !playerId) return;
 
@@ -512,7 +519,7 @@ io.on('connection', (socket) => {
         playerToRejoin.status = 'Active'; 
         playerToRejoin.socketId = socket.id;
         
-        // *** START: RECONNECTION LOGIC ***
+        // *** START: RECONNECTION LOGIC (Unchanged) ***
         if (reconnectTimers[playerToRejoin.playerId]) {
             clearTimeout(reconnectTimers[playerToRejoin.playerId]);
             delete reconnectTimers[playerToRejoin.playerId];
@@ -527,7 +534,7 @@ io.on('connection', (socket) => {
         } else {
             gameState.pauseInfo.pausedForPlayerNames = otherDisconnected.map(p => p.name);
         }
-        // *** END: RECONNECTION LOGIC ***
+        // *** END: RECONNECTION LOGIC (Unchanged) ***
 
         io.emit('updateGameState', gameState);
     } else if (playerToRejoin && playerToRejoin.status === 'Active') {
@@ -536,25 +543,18 @@ io.on('connection', (socket) => {
     }
   });
 
-  // *** START: NEW KICK PLAYER HANDLER ***
   socket.on('kickPlayer', ({ playerIdToKick }) => {
-    // Check if game is in progress
     if (gameState) return;
-
-    // Find host
     const host = players.find(p => p.socketId === socket.id && p.isHost);
     if (host) {
         const playerToKick = players.find(p => p.playerId === playerIdToKick);
         if (playerToKick) {
             console.log(`Host ${host.name} kicked ${playerToKick.name}`);
-            // Remove player from lobby
             players = players.filter(player => player.playerId !== playerIdToKick);
-            // Broadcast new lobby state
             io.emit('lobbyUpdate', players);
         }
     }
   });
-  // *** END: NEW KICK PLAYER HANDLER ***
 
   socket.on('startGame', () => {
     const host = players.find(p => p.socketId === socket.id && p.isHost);
@@ -599,7 +599,7 @@ io.on('connection', (socket) => {
 
 
   socket.on('dealChoice', ({ numCards }) => {
-    if (gameState.isPaused) return; // *** RENAMED
+    if (gameState.isPaused) return; 
     const dealingPlayer = gameState.players.find(p => p.socketId === socket.id);
       if (gameState && gameState.needsDealChoice === dealingPlayer?.playerId) {
           const numToDeal = Math.max(1, Math.min(13, parseInt(numCards) || 7));
@@ -623,7 +623,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('playCard', ({ cardIndex }) => {
-    if (!gameState || gameState.isPaused) return; // *** RENAMED
+    if (!gameState || gameState.isPaused) return; 
     const playerIndex = gameState.players.findIndex(p => p.socketId === socket.id);
     if (playerIndex !== -1) {
         handleCardPlay(playerIndex, cardIndex);
@@ -634,7 +634,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('callUno', () => {
-    if (!gameState || gameState.isPaused) return; // *** RENAMED
+    if (!gameState || gameState.isPaused) return; 
     const player = gameState.players.find(p => p.socketId === socket.id);
     if (player && player.hand.length === 2) {
         player.unoState = 'declared';
@@ -644,12 +644,13 @@ io.on('connection', (socket) => {
 
 
   socket.on('drawCard', () => {
-    if (!gameState || gameState.roundOver || gameState.isPaused) return; // *** RENAMED
+    if (!gameState || gameState.roundOver || gameState.isPaused) return; 
     const playerIndex = gameState.players.findIndex(p => p.socketId === socket.id);
 
     if (playerIndex === gameState.currentPlayerIndex) {
         const player = gameState.players[playerIndex];
-        const topCard = gameState.discardPile[0];
+        // *** MODIFIED: Get top card from object ***
+        const topCard = gameState.discardPile[0].card;
 
         if (gameState.pickUntilState?.active && gameState.pickUntilState.targetPlayerIndex === playerIndex) {
             if (gameState.drawPile.length > 0) {
@@ -659,7 +660,8 @@ io.on('connection', (socket) => {
                 addLog(`› ${player.name} is picking for a ${gameState.pickUntilState.targetColor}...`);
                 if (drawnCard.color === gameState.pickUntilState.targetColor) {
                     player.hand.splice(player.hand.findIndex(c => c === drawnCard), 1);
-                    gameState.discardPile.unshift(drawnCard);
+                    // *** MODIFIED: Add object to discard pile ***
+                    gameState.discardPile.unshift({ card: drawnCard, playerName: player.name });
                     gameState.activeColor = drawnCard.color;
                     io.to(socket.id).emit('announce', `You drew the target color (${drawnCard.value} ${drawnCard.color}) and it was played for you.`);
                     addLog(`› ${player.name} found and played a ${drawnCard.color} card.`);
@@ -731,7 +733,8 @@ io.on('connection', (socket) => {
                         io.to(socket.id).emit('drawnWildCard', { cardIndex, drawnCard });
                         return;
                     } else {
-                        gameState.discardPile.unshift(drawnCard);
+                        // *** MODIFIED: Add object to discard pile ***
+                        gameState.discardPile.unshift({ card: drawnCard, playerName: player.name });
                         gameState.activeColor = drawnCard.color;
                         applyCardEffect(drawnCard);
                         io.to(socket.id).emit('announce', `You drew a playable card (${drawnCard.value} ${drawnCard.color}) and it was played for you.`);
@@ -760,7 +763,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('choosePlayDrawnWild', ({ play, cardIndex }) => {
-    if (!gameState || gameState.isPaused) return; // *** RENAMED
+    if (!gameState || gameState.isPaused) return; 
     const playerIndex = gameState.players.findIndex(p => p.socketId === socket.id);
     if (play) {
         const player = gameState.players[playerIndex];
@@ -779,7 +782,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('pickUntilChoice', ({ choice }) => {
-      if (!gameState || gameState.isPaused) return; // *** RENAMED
+      if (!gameState || gameState.isPaused) return; 
       const player = gameState.players.find(p => p.socketId === socket.id);
       if (gameState.needsPickUntilChoice !== player.playerId) return;
 
@@ -842,7 +845,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('swapHandsChoice', ({ targetPlayerId }) => {
-    if (!gameState || gameState.isPaused) return; // *** RENAMED
+    if (!gameState || gameState.isPaused) return; 
     const choosingPlayer = gameState.players.find(p => p.socketId === socket.id);
     if (gameState.needsSwapChoice !== choosingPlayer.playerId) return;
 
@@ -859,7 +862,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('colorChosen', ({ color }) => {
-    if (!gameState || gameState.isPaused) return; // *** RENAMED
+    if (!gameState || gameState.isPaused) return; 
     const choosingPlayer = gameState.players.find(p => p.socketId === socket.id);
     if (gameState.needsColorChoice !== choosingPlayer.playerId) return;
 
@@ -896,9 +899,8 @@ io.on('connection', (socket) => {
     }
   });
 
-  // *** START: NEW 'markPlayerAFK' HANDLER ***
   socket.on('markPlayerAFK', ({ playerIdToMark }) => {
-    if (!gameState || gameState.isPaused) return; // Don't allow marking AFK if already paused
+    if (!gameState || gameState.isPaused) return; 
 
     const host = gameState.players.find(p => p.socketId === socket.id && p.isHost);
     const playerToMark = gameState.players.find(p => p.playerId === playerIdToMark);
@@ -931,9 +933,7 @@ io.on('connection', (socket) => {
         io.emit('updateGameState', gameState);
     }
   });
-  // *** END: NEW 'markPlayerAFK' HANDLER ***
 
-  // *** START: NEW 'playerIsBack' HANDLER ***
   socket.on('playerIsBack', () => {
     if (!gameState) return;
     const player = gameState.players.find(p => p.socketId === socket.id);
@@ -962,10 +962,8 @@ io.on('connection', (socket) => {
         io.emit('updateGameState', gameState);
     }
   });
-  // *** END: NEW 'playerIsBack' HANDLER ***
 
 
-  // *** REFACTORED: 'disconnect' HANDLER ***
   socket.on('disconnect', () => {
     console.log(`Player disconnected: ${socket.id}`);
 
@@ -1010,7 +1008,6 @@ io.on('connection', (socket) => {
         }
     }
   });
-  // *** END: REFACTORED 'disconnect' HANDLER ***
 });
 
 const PORT = process.env.PORT || 3000;
