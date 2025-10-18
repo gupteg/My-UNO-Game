@@ -1,13 +1,10 @@
 window.addEventListener('DOMContentLoaded', () => {
-    const socket = io('https://gupte-family-uno-game.onrender.com');
+    const socket = io(); // Assuming server is on the same origin
+    // const socket = io('https://gupte-family-uno-game.onrender.com'); // Use this for production
 
     let myPersistentPlayerId = sessionStorage.getItem('unoPlayerId');
     let isGameOver = false;
     let countdownInterval = null;
-    const DISCONNECT_GRACE_PERIOD = 60000; // Match server setting
-
-    let playerIdToKick = null;
-    let playerIdToMarkAFK = null;
 
     // --- SCREEN & ELEMENT REFERENCES ---
     const joinScreen = document.getElementById('join-screen');
@@ -47,18 +44,10 @@ window.addEventListener('DOMContentLoaded', () => {
     const arrangeHandBtn = document.getElementById('arrangeHandBtn');
     const hostRoundEndControls = document.getElementById('host-round-end-controls');
     const nextRoundOkBtn = document.getElementById('next-round-ok-btn');
-
-    const confirmKickModal = document.getElementById('confirm-kick-modal');
-    const confirmKickMessage = document.getElementById('confirm-kick-message');
-    const confirmKickYesBtn = document.getElementById('confirm-kick-yes-btn');
-    const confirmKickNoBtn = document.getElementById('confirm-kick-no-btn');
-    const confirmAfkModal = document.getElementById('confirm-afk-modal');
-    const confirmAfkMessage = document.getElementById('confirm-afk-message');
-    const confirmAfkYesBtn = document.getElementById('confirm-afk-yes-btn');
-    const confirmAfkNoBtn = document.getElementById('confirm-afk-no-btn');
-
+    
+    // *** NEW: AFK Modal References ***
     const afkNotificationModal = document.getElementById('afk-notification-modal');
-    const afkReloadBtn = document.getElementById('afk-reload-btn');
+    const imBackBtn = document.getElementById('im-back-btn');
 
 
     joinScreen.style.display = 'block';
@@ -80,6 +69,29 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // *** NEW: Lobby Kick Button Listener ***
+    playerList.addEventListener('click', (event) => {
+        if (event.target.classList.contains('kick-btn')) {
+            const playerIdToKick = event.target.dataset.playerId;
+            socket.emit('kickPlayer', { playerIdToKick });
+        }
+    });
+
+    // *** NEW: In-Game AFK Button Listener ***
+    document.getElementById('left-column').addEventListener('click', (event) => {
+        if (event.target.classList.contains('mark-afk-btn')) {
+            const playerIdToMark = event.target.dataset.playerId;
+            socket.emit('markPlayerAFK', { playerIdToMark });
+        }
+    });
+
+    // *** NEW: "I'm Back" Button Listener ***
+    imBackBtn.addEventListener('click', () => {
+        socket.emit('playerIsBack');
+        afkNotificationModal.style.display = 'none';
+    });
+
+
     startGameBtn.addEventListener('click', () => { socket.emit('startGame'); });
     drawCardBtn.addEventListener('click', () => { socket.emit('drawCard'); });
 
@@ -97,6 +109,8 @@ window.addEventListener('DOMContentLoaded', () => {
         gameBoard.style.display = 'none';
         lobbyScreen.style.display = 'none';
         joinScreen.style.display = 'block';
+        sessionStorage.clear(); // *** NEW: Clear session on final OK
+        myPersistentPlayerId = null;
     });
 
 
@@ -185,34 +199,6 @@ window.addEventListener('DOMContentLoaded', () => {
         displayGame(window.gameState);
     });
 
-    confirmKickYesBtn.addEventListener('click', () => {
-        if (playerIdToKick) {
-            socket.emit('kickPlayer', { playerId: playerIdToKick });
-        }
-        confirmKickModal.style.display = 'none';
-        playerIdToKick = null;
-    });
-    confirmKickNoBtn.addEventListener('click', () => {
-        confirmKickModal.style.display = 'none';
-        playerIdToKick = null;
-    });
-
-    confirmAfkYesBtn.addEventListener('click', () => {
-        if (playerIdToMarkAFK) {
-            socket.emit('markPlayerAFK', { playerId: playerIdToMarkAFK });
-        }
-        confirmAfkModal.style.display = 'none';
-        playerIdToMarkAFK = null;
-    });
-    confirmAfkNoBtn.addEventListener('click', () => {
-        confirmAfkModal.style.display = 'none';
-        playerIdToMarkAFK = null;
-    });
-
-    afkReloadBtn.addEventListener('click', () => {
-        window.location.reload();
-    });
-
 
     // --- EVENT LISTENERS (Receiving messages from server) ---
 
@@ -220,7 +206,9 @@ window.addEventListener('DOMContentLoaded', () => {
         console.log('Socket connected with ID:', socket.id);
         if (myPersistentPlayerId) {
             console.log('Attempting to rejoin with existing ID:', myPersistentPlayerId);
-            socket.emit('rejoinGame', myPersistentPlayerId);
+            // *** Use 'joinGame' for all rejoining to unify logic ***
+            const playerName = playerNameInput.value.trim() || "Player";
+            socket.emit('joinGame', { playerName, playerId: myPersistentPlayerId });
         }
     });
 
@@ -238,32 +226,10 @@ window.addEventListener('DOMContentLoaded', () => {
         renderLobby(players);
     });
 
-    socket.on('kicked', () => {
-        alert('You have been kicked from the lobby by the host.');
-        sessionStorage.removeItem('unoPlayerId');
-        window.location.reload();
-    });
-
-    socket.on('youWereMarkedAFK', () => {
-        afkNotificationModal.style.display = 'flex';
-        colorPickerModal.style.display = 'none';
-        pickUntilModal.style.display = 'none';
-        swapModal.style.display = 'none';
-        drawnWildModal.style.display = 'none';
-        dealChoiceModal.style.display = 'none';
-        confirmEndGameModal.style.display = 'none';
-        endOfRoundDiv.style.display = 'none';
-    });
-
     socket.on('updateGameState', (gameState) => {
         if (gameState.roundOver) {
             displayGame(gameState);
         } else {
-            // Only hide the AFK modal if the player is now 'Active' again
-            const myPlayer = gameState.players.find(p => p.playerId === myPersistentPlayerId);
-            if(myPlayer && myPlayer.status === 'Active') {
-                afkNotificationModal.style.display = 'none';
-            }
             joinScreen.style.display = 'none';
             lobbyScreen.style.display = 'none';
             endOfRoundDiv.style.display = 'none';
@@ -295,7 +261,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
         const myPlayer = finalGameState.players.find(p => p.playerId === myPersistentPlayerId);
 
-        if (myPlayer.isHost) {
+        if (myPlayer && myPlayer.isHost) { // *** NEW: Added 'myPlayer' check
             hostRoundEndControls.style.display = 'flex';
             nextRoundOkBtn.style.display = 'none';
             nextRoundBtn.disabled = false;
@@ -312,7 +278,6 @@ window.addEventListener('DOMContentLoaded', () => {
         isGameOver = true;
         gameBoard.style.display = 'none';
         endOfRoundDiv.style.display = 'none';
-        afkNotificationModal.style.display = 'none';
         renderFinalScores(finalGameState);
         finalScoreModal.style.display = 'flex';
     });
@@ -334,11 +299,19 @@ window.addEventListener('DOMContentLoaded', () => {
         showToast(message);
     });
 
+    // *** NEW: Listener for AFK modal ***
+    socket.on('youWereMarkedAFK', () => {
+        afkNotificationModal.style.display = 'flex';
+    });
+
+
     socket.on('playerDisconnected', ({ playerName }) => {
-        showToast(`${playerName} disconnected. Game paused.`);
+        // This is now handled by the 'gameLog' and action bar
+        // showToast(`${playerName} disconnected. Game paused.`);
     });
     socket.on('playerReconnected', ({ playerName }) => {
-        showToast(`${playerName} has reconnected!`);
+        // This is now handled by the 'gameLog'
+        // showToast(`${playerName} has reconnected!`);
     });
 
     socket.on('unoCalled', ({ playerName }) => {
@@ -365,6 +338,19 @@ window.addEventListener('DOMContentLoaded', () => {
     // --- ALL DISPLAY AND HELPER FUNCTIONS ---
 
     function renderLobby(players) {
+        // *** NEW: Check if 'me' exists (i.e., not kicked) ***
+        const me = players.find(p => p.playerId === myPersistentPlayerId);
+        if (!me) {
+            // I have been kicked
+            showToast("You have been kicked from the lobby.");
+            sessionStorage.clear();
+            myPersistentPlayerId = null;
+            setTimeout(() => {
+                location.reload();
+            }, 1500);
+            return;
+        }
+
         joinScreen.style.display = 'none';
         lobbyScreen.style.display = 'block';
         gameBoard.style.display = 'none';
@@ -373,29 +359,28 @@ window.addEventListener('DOMContentLoaded', () => {
 
         playerList.innerHTML = '';
         if (gameLogList) gameLogList.innerHTML = '';
-        let amIHost = false;
+        
+        let amIHost = me.isHost; // Use 'me' to check host status
+
         players.forEach(player => {
             const playerItem = document.createElement('li');
-            const playerNameSpan = document.createElement('span');
-
+            
+            // Player name span
+            const nameSpan = document.createElement('span');
             let content = player.name;
             if (player.isHost) { content += ' 👑 (Host)'; }
             if (player.playerId === myPersistentPlayerId) {
                 content += ' (You)';
-                amIHost = player.isHost;
             }
-            playerNameSpan.textContent = content;
-            playerItem.appendChild(playerNameSpan);
-
+            nameSpan.textContent = content;
+            playerItem.appendChild(nameSpan);
+            
+            // *** NEW: Add Kick Button if Host ***
             if (amIHost && player.playerId !== myPersistentPlayerId) {
                 const kickBtn = document.createElement('button');
+                kickBtn.className = 'kick-btn';
                 kickBtn.textContent = 'Kick';
-                kickBtn.className = 'host-control-btn';
-                kickBtn.addEventListener('click', () => {
-                    playerIdToKick = player.playerId;
-                    confirmKickMessage.textContent = `Are you sure you want to kick ${player.name} from the lobby?`;
-                    confirmKickModal.style.display = 'flex';
-                });
+                kickBtn.dataset.playerId = player.playerId;
                 playerItem.appendChild(kickBtn);
             }
 
@@ -447,8 +432,8 @@ window.addEventListener('DOMContentLoaded', () => {
         cardElement.classList.add('invalid-shake');
         const cardRect = cardElement.getBoundingClientRect();
         const boardRect = gameBoard.getBoundingClientRect();
-        invalidMoveCallout.style.top = `${cardRect.top - boardRect.top - 40}px`;
-        invalidMoveCallout.style.left = `${cardRect.left - boardRect.left + (cardRect.width / 2) - (invalidMoveCallout.offsetWidth / 2)}px`;
+        invalidMoveCallout.style.top = `${cardRect.top - boardRect.top - 40}px`; 
+        invalidMoveCallout.style.left = `${cardRect.left - boardRect.left + (cardRect.width / 2) - (invalidMoveCallout.offsetWidth / 2)}px`; 
         invalidMoveCallout.classList.add('show');
         setTimeout(() => {
             cardElement.classList.remove('invalid-shake');
@@ -506,7 +491,7 @@ window.addEventListener('DOMContentLoaded', () => {
         const startRect = drawPileEl.getBoundingClientRect();
         const endRect = playerAreaEl.getBoundingClientRect();
         const boardRect = gameBoard.getBoundingClientRect();
-        const smallCardWidth = 80;
+        const smallCardWidth = 80; 
         const scaleFactor = smallCardWidth / startRect.width;
 
         for (let i = 0; i < count; i++) {
@@ -702,7 +687,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
 
     function displayGame(gameState) {
-        window.gameState = gameState;
+        window.gameState = gameState; 
 
         if (countdownInterval) {
             clearInterval(countdownInterval);
@@ -713,26 +698,29 @@ window.addEventListener('DOMContentLoaded', () => {
         renderPiles(gameState);
 
         const myPlayer = gameState.players.find(p => p.playerId === myPersistentPlayerId);
-        if (!myPlayer) return;
+        if (!myPlayer) {
+            // Failsafe in case player is removed mid-game
+            showToast("You have been removed from the game.");
+            sessionStorage.clear();
+            setTimeout(() => location.reload(), 1500);
+            return;
+        }
 
         const isMyTurn = myPlayer && gameState.players[gameState.currentPlayerIndex]?.playerId === myPlayer.playerId;
-        const gameSuspended = gameState.isSuspended;
+        const isPaused = gameState.isPaused; // *** RENAMED
         const isHost = myPlayer.isHost;
 
         endGameBtn.style.display = (isHost && !gameState.roundOver) ? 'block' : 'none';
 
+        // *** START: UPDATED ACTION BAR LOGIC ***
         if (actionBar) {
-            if (gameSuspended && gameState.suspensionInfo) {
-                const { disconnectTime } = gameState.suspensionInfo;
-                const disconnectedNames = gameState.players
-                    .filter(p => p.status === 'Disconnected')
-                    .map(p => p.name)
-                    .join(', ');
+            if (isPaused && gameState.pauseInfo && gameState.pauseInfo.pauseEndTime) {
+                const { pauseEndTime, pausedForPlayerNames } = gameState.pauseInfo;
+                const names = pausedForPlayerNames.join(', ');
 
                 const updateTimer = () => {
-                    const elapsed = (Date.now() - disconnectTime) / 1000;
-                    const remaining = Math.max(0, Math.floor(DISCONNECT_GRACE_PERIOD/1000 - elapsed));
-                    actionBar.textContent = `Waiting ${remaining}s for ${disconnectedNames} to rejoin...`;
+                    const remaining = Math.max(0, Math.floor((pauseEndTime - Date.now()) / 1000));
+                    actionBar.textContent = `Waiting ${remaining}s for ${names} to rejoin...`;
                 };
                 updateTimer();
                 countdownInterval = setInterval(updateTimer, 1000);
@@ -762,12 +750,14 @@ window.addEventListener('DOMContentLoaded', () => {
                 if (currentPlayer.status === 'Active') {
                     actionBar.textContent = `Waiting for ${currentPlayer.name} to play...`;
                 } else {
+                    // This state should be brief as the turn advances, but good to have
                     actionBar.textContent = `Waiting for ${currentPlayer.name} to reconnect...`;
                 }
             } else {
                 actionBar.textContent = "Game is starting...";
             }
         }
+        // *** END: UPDATED ACTION BAR LOGIC ***
 
         if (gameState.roundOver && !gameState.readyForNextRound.includes(myPlayer.playerId)) {
             endOfRoundDiv.style.display = 'flex';
@@ -781,7 +771,7 @@ window.addEventListener('DOMContentLoaded', () => {
             } else {
                 unoBtn.style.backgroundColor = '#333';
             }
-            if (myPlayer && myPlayer.hand.length === 2 && !gameSuspended && !gameState.roundOver) {
+            if (myPlayer && myPlayer.hand.length === 2 && !isPaused && !gameState.roundOver) {
                 unoBtn.disabled = false;
                 unoBtn.classList.add('uno-ready');
             } else {
@@ -805,18 +795,18 @@ window.addEventListener('DOMContentLoaded', () => {
                     drawCardBtn.textContent = 'DRAW CARD';
                 }
 
-                drawCardBtn.disabled = !isMyTurn || gameSuspended || gameState.roundOver;
+                drawCardBtn.disabled = !isMyTurn || isPaused || gameState.roundOver;
             } else {
                  drawCardBtn.textContent = 'DRAW CARD';
                  drawCardBtn.disabled = true;
             }
         }
 
-        colorPickerModal.style.display = (gameState.needsColorChoice === myPersistentPlayerId && !gameSuspended) ? 'flex' : 'none';
-        pickUntilModal.style.display = (gameState.needsPickUntilChoice === myPersistentPlayerId && !gameSuspended) ? 'flex' : 'none';
-        dealChoiceModal.style.display = (gameState.needsDealChoice === myPersistentPlayerId && !gameSuspended) ? 'flex' : 'none';
+        colorPickerModal.style.display = (gameState.needsColorChoice === myPersistentPlayerId && !isPaused) ? 'flex' : 'none';
+        pickUntilModal.style.display = (gameState.needsPickUntilChoice === myPersistentPlayerId && !isPaused) ? 'flex' : 'none';
+        dealChoiceModal.style.display = (gameState.needsDealChoice === myPersistentPlayerId && !isPaused) ? 'flex' : 'none';
 
-        if (gameState.needsSwapChoice === myPersistentPlayerId && !gameSuspended) {
+        if (gameState.needsSwapChoice === myPersistentPlayerId && !isPaused) {
             const swapOptions = document.getElementById('swap-player-options');
             swapOptions.innerHTML = '';
             gameState.players.forEach(player => {
@@ -888,7 +878,7 @@ window.addEventListener('DOMContentLoaded', () => {
                 const myPlayer = gameState.players.find(p => p.playerId === myPersistentPlayerId);
                 const isMyTurn = myPlayer && gameState.players[gameState.currentPlayerIndex].playerId === myPlayer.playerId;
 
-                if(isMyTurn && !gameState.isSuspended && !gameState.roundOver) {
+                if(isMyTurn && !gameState.isPaused && !gameState.roundOver) { // *** RENAMED
                     const playedCard = myPlayer.hand[draggedCardIndex];
                     if (isClientMoveValid(playedCard, gameState)) {
                         socket.emit('playCard', { cardIndex: draggedCardIndex });
@@ -908,6 +898,8 @@ window.addEventListener('DOMContentLoaded', () => {
         const myPlayer = gameState.players.find(p => p.playerId === myPersistentPlayerId);
         if (!myPlayer) return;
 
+        const isHost = myPlayer.isHost; // *** NEW: Get host status
+
         gameState.players.forEach((player, playerIndex) => {
             const playerArea = document.createElement('div');
             playerArea.className = 'player-area';
@@ -921,7 +913,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
             const isCurrentPlayer = playerIndex === gameState.currentPlayerIndex;
             const isDealerChoosing = player.playerId === gameState.needsDealChoice;
-            if ((isCurrentPlayer && player.status === 'Active' && !gameState.isSuspended && !gameState.roundOver) || isDealerChoosing) {
+            if ((isCurrentPlayer && player.status === 'Active' && !gameState.isPaused && !gameState.roundOver) || isDealerChoosing) { // *** RENAMED
                 playerArea.classList.add('active-player');
             }
 
@@ -937,21 +929,23 @@ window.addEventListener('DOMContentLoaded', () => {
 
             const playerInfo = document.createElement('div');
             playerInfo.className = 'player-info';
+            
+            // Player name and info span
+            const nameSpan = document.createElement('span');
             const hostIndicator = player.isHost ? '👑 ' : '';
-            playerInfo.innerHTML = `${hostIndicator}${player.name} (${player.hand.length} cards) <span class="player-score">Score: ${player.score}</span>`;
-            playerArea.appendChild(playerInfo);
+            nameSpan.innerHTML = `${hostIndicator}${player.name} (${player.hand.length} cards) <span class="player-score">Score: ${player.score}</span>`;
+            playerInfo.appendChild(nameSpan);
 
-            if (myPlayer.isHost && player.playerId !== myPersistentPlayerId && player.status === 'Active' && !gameState.roundOver) {
+            // *** NEW: Add AFK Button if Host ***
+            if (isHost && player.playerId !== myPersistentPlayerId && player.status === 'Active' && !gameState.roundOver) {
                 const afkBtn = document.createElement('button');
-                afkBtn.textContent = 'AFK';
-                afkBtn.className = 'host-control-btn';
-                afkBtn.addEventListener('click', () => {
-                    playerIdToMarkAFK = player.playerId;
-                    confirmAfkMessage.textContent = `Are you sure you want to mark ${player.name} as AFK? This will pause the game for 60 seconds.`;
-                    confirmAfkModal.style.display = 'flex';
-                });
-                playerArea.appendChild(afkBtn);
+                afkBtn.className = 'mark-afk-btn';
+                afkBtn.textContent = 'Mark AFK';
+                afkBtn.dataset.playerId = player.playerId;
+                playerInfo.appendChild(afkBtn);
             }
+
+            playerArea.appendChild(playerInfo);
 
             const cardContainer = document.createElement('div');
             cardContainer.className = 'card-container';
@@ -960,19 +954,19 @@ window.addEventListener('DOMContentLoaded', () => {
                 const serverHand = window.gameState.players.find(p => p.playerId === myPersistentPlayerId).hand;
 
                 player.hand.forEach((card, clientIndex) => {
-                    const originalCardIndex = serverHand.findIndex((serverCard, serverIndex) =>
+                    const originalCardIndex = serverHand.findIndex((serverCard, serverIndex) => 
                         serverCard.color === card.color && serverCard.value === card.value && !Array.from(cardContainer.children).some(el => parseInt(el.dataset.cardIndex) === serverIndex)
                     );
 
                     const cardEl = createCardElement(card, originalCardIndex);
 
                     const isMyTurn = playerIndex === gameState.currentPlayerIndex;
-                    if (isMyTurn && !gameState.isSuspended && !gameState.roundOver && player.status === 'Active') {
+                    if (isMyTurn && !gameState.isPaused && !gameState.roundOver && player.status === 'Active') { // *** RENAMED
                         cardEl.classList.add('clickable');
                     }
 
                     cardEl.addEventListener('click', () => {
-                        if (isMyTurn && !gameState.isSuspended && !gameState.roundOver && player.status === 'Active') {
+                        if (isMyTurn && !gameState.isPaused && !gameState.roundOver && player.status === 'Active') { // *** RENAMED
                             if (isClientMoveValid(card, gameState)) {
                                 socket.emit('playCard', { cardIndex: originalCardIndex });
                             } else {
@@ -981,12 +975,12 @@ window.addEventListener('DOMContentLoaded', () => {
                         }
                     });
 
-                    cardEl.draggable = !gameState.isSuspended && !gameState.roundOver;
+                    cardEl.draggable = !gameState.isPaused && !gameState.roundOver; // *** RENAMED
                     cardContainer.appendChild(cardEl);
                 });
 
                 cardContainer.addEventListener('dragstart', e => {
-                    if (gameState.isSuspended || gameState.roundOver) {
+                    if (gameState.isPaused || gameState.roundOver) { // *** RENAMED
                         e.preventDefault();
                         return;
                     }
@@ -1022,7 +1016,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
                 cardContainer.addEventListener('dragover', e => {
                     e.preventDefault();
-                    if (gameState.isSuspended || gameState.roundOver) return;
+                    if (gameState.isPaused || gameState.roundOver) return; // *** RENAMED
                     const afterElement = getDragAfterElement(cardContainer, e.clientX);
                     if (draggedCardElement) {
                         if (afterElement == null) {
@@ -1033,8 +1027,8 @@ window.addEventListener('DOMContentLoaded', () => {
                     }
                 });
 
-            } else {
-                if (gameState.roundOver && (player.status === 'Active' || player.status === 'Disconnected')) {
+            } else { 
+                if (gameState.roundOver && player.status === 'Active') {
                     player.hand.forEach((card, cardIndex) => {
                         const cardEl = createCardElement(card, cardIndex);
                         cardContainer.appendChild(cardEl);
@@ -1084,8 +1078,6 @@ window.addEventListener('DOMContentLoaded', () => {
     makeDraggable(document.getElementById('confirm-end-game-modal'));
     makeDraggable(document.getElementById('end-of-round-div'));
     makeDraggable(document.getElementById('final-score-modal'));
-    makeDraggable(document.getElementById('confirm-kick-modal'));
-    makeDraggable(document.getElementById('confirm-afk-modal'));
-    makeDraggable(document.getElementById('afk-notification-modal'));
+    makeDraggable(document.getElementById('afk-notification-modal')); // *** NEW
 
-}); // <-- REMOVED THE EXTRA '}' FROM HERE
+});
