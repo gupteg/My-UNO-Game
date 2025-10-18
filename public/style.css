@@ -3,10 +3,10 @@ body {
   background-color: #006a4e;
   padding: 10px;
   margin: 0;
-  min-height: 100vh; /* <--- SOLUTION: Allows body to grow */
+  min-height: 100vh; /* Allows body to grow */
   box-sizing: border-box;
   color: #333;
-  overflow-x: hidden; /* <--- SOLUTION: Prevents horizontal scroll */
+  overflow-x: hidden; /* Prevents horizontal scroll */
 }
 
 #join-screen, #lobby-screen {
@@ -778,7 +778,7 @@ body {
     body {
         padding: 5px;
         /* Increased padding for more scroll space below fixed buttons */
-        padding-bottom: 240px; /* <--- This is the correct buffer */
+        padding-bottom: 240px;
         overflow-y: auto;
         /* overflow-x: hidden; is now on the base body style */
     }
@@ -786,6 +786,7 @@ body {
     #game-board {
         flex-direction: column;
         padding-top: 40px;
+        height: auto; /* <--- THE FINAL FIX: Allows board to grow */
     }
 
     #left-column {
