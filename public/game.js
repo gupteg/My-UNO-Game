@@ -146,7 +146,7 @@ window.addEventListener('DOMContentLoaded', () => {
         renderPlayers(gameState);
         renderPiles(gameState); // Creates piles and arrow
 
-        // *** NEW: Update Direction Arrow Class AND Color ***
+        // *** Update Direction Arrow Class AND Color (Now Correctly Placed) ***
         const currentDirectionArrow = document.getElementById('direction-arrow');
         if (currentDirectionArrow) {
             // Rotation
@@ -173,8 +173,6 @@ window.addEventListener('DOMContentLoaded', () => {
         } else {
              console.error("Direction arrow element not found after renderPiles");
         }
-        // *** End NEW ***
-
 
         const myPlayer = gameState.players.find(p => p.playerId === myPersistentPlayerId);
         if (!myPlayer) { showToast("You have been removed from the game."); sessionStorage.clear(); setTimeout(() => location.reload(), 1500); return; }
@@ -218,13 +216,13 @@ window.addEventListener('DOMContentLoaded', () => {
         drawPileWrapper.appendChild(cardBackElement);
         pilesContainer.appendChild(drawPileWrapper); // Add draw pile to container FIRST
 
-        // *** NEW: Create and add the SVG arrow element ***
+        // *** Create and add the SVG arrow element ***
         const arrowElement = document.createElement('div');
         arrowElement.id = 'direction-arrow';
-        // SVG for a thick arrow pointing down - REMOVED default fill
+        // *** MODIFIED: SVG for a THICKER arrow pointing down ***
         arrowElement.innerHTML = `
             <svg viewBox="0 0 100 220" preserveAspectRatio="xMidYMid meet" style="width: 100%; height: 100%; filter: drop-shadow(1px 1px 2px black);">
-                <path d="M50 210 L80 170 L65 170 L65 10 L35 10 L35 170 L20 170 Z" />
+                <path d="M50 210 L90 160 L70 160 L70 10 L30 10 L30 160 L10 160 Z" />
             </svg>
         `;
         pilesContainer.appendChild(arrowElement); // Add arrow BETWEEN piles
