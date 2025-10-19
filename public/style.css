@@ -780,19 +780,20 @@ body {
 
 /* *** MODIFIED: Direction Arrow Styles using SVG *** */
 #direction-arrow {
-    width: 60px; /* Increased width for desktop */
+    width: 60px; /* Slightly wider */
     height: 220px; /* Match card height */
     transition: transform 0.5s ease; /* Smooth rotation */
-    transform-origin: center center; /* Rotate around the center */
-    animation: pulse 2s infinite ease-in-out; /* Add pulsating animation */
-    /* *** NEW: Explicitly set base rotation *** */
-    transform: rotate(0deg);
+    transform-origin: center center;
+    transform: rotate(0deg); /* Explicit base rotation */
+    /* Animation removed from container */
 }
 
 #direction-arrow svg {
-    display: block; /* Remove extra space below */
+    display: block;
     width: 100%;
     height: 100%;
+    /* Apply animation to SVG */
+    animation: pulse 2s infinite ease-in-out;
 }
 
 #direction-arrow svg path {
@@ -801,19 +802,18 @@ body {
 }
 
 #direction-arrow.reversed {
-    /* *** MODIFIED: Explicitly set reversed rotation *** */
-    transform: rotate(180deg);
+    transform: rotate(180deg); /* Rotation applied to container */
 }
 
-/* *** Pulsating Animation (using transform: scale) *** */
+/* *** Pulsating Animation *** */
 @keyframes pulse {
   0%, 100% {
     opacity: 1;
     transform: scale(1);
   }
   50% {
-    opacity: 0.75; /* Dim slightly */
-    transform: scale(1.05); /* Subtle scale */
+    opacity: 0.75;
+    transform: scale(1.05); /* Animation only scales */
   }
 }
 
