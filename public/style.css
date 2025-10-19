@@ -943,3 +943,12 @@ body {
 .discard-result-cards .card { width: 60px; height: 90px; font-size: 24px; }
 .discard-result-cards .card .number-circle { width: 35px; height: 35px; }
 .discard-result-cards .card .action-text { font-size: 14px; }
+
+/* --- CHANGE C: Style for empty discard wilds modal --- */
+.discard-wilds-empty-msg {
+    text-align: center;
+    width: 100%;
+    color: #ffc107;
+    font-style: italic;
+}
+/* --- END CHANGE C --- */

@@ -113,7 +113,38 @@ window.addEventListener('DOMContentLoaded', () => {
     socket.on('youWereMarkedAFK', () => { afkNotificationModal.style.display = 'flex'; });
     socket.on('unoCalled', ({ playerName }) => { showUnoAnnouncement(`${playerName} says UNO!`); });
     socket.on('gameLog', (message) => { addMessageToGameLog(message); });
-    socket.on('showDiscardWildsModal', (allDiscardedData) => { discardWildsResults.innerHTML = ''; if (allDiscardedData.length === 0) { discardWildsResults.innerHTML = '<p>No players had any Wild cards to discard.</p>'; } else { allDiscardedData.forEach(playerData => { const playerGroup = document.createElement('div'); playerGroup.className = 'discard-result-player'; const playerName = document.createElement('p'); playerName.className = 'discard-result-player-name'; playerName.textContent = `${playerData.playerName} discarded:`; playerGroup.appendChild(playerName); const cardContainer = document.createElement('div'); cardContainer.className = 'discard-result-cards'; if (playerData.cards.length === 0) { const noCardsMsg = document.createElement('span'); noCardsMsg.textContent = '(No cards)'; cardContainer.appendChild(noCardsMsg); } else { playerData.cards.forEach(card => { const cardEl = createCardElement(card, -1); cardContainer.appendChild(cardEl); }); } playerGroup.appendChild(cardContainer); discardWildsResults.appendChild(playerGroup); }); } discardWildsModal.style.display = 'flex'; });
+    socket.on('showDiscardWildsModal', (allDiscardedData) => {
+        discardWildsResults.innerHTML = '';
+        // --- CHANGE C: Show prominent message if array is empty ---
+        if (allDiscardedData.length === 0) {
+            discardWildsResults.innerHTML = '<h3 class="discard-wilds-empty-msg">...but no other players had any Wild cards!</h3>';
+        } else {
+            allDiscardedData.forEach(playerData => {
+                const playerGroup = document.createElement('div');
+                playerGroup.className = 'discard-result-player';
+                const playerName = document.createElement('p');
+                playerName.className = 'discard-result-player-name';
+                playerName.textContent = `${playerData.playerName} discarded:`;
+                playerGroup.appendChild(playerName);
+                const cardContainer = document.createElement('div');
+                cardContainer.className = 'discard-result-cards';
+                if (playerData.cards.length === 0) {
+                    const noCardsMsg = document.createElement('span');
+                    noCardsMsg.textContent = '(No cards)';
+                    cardContainer.appendChild(noCardsMsg);
+                } else {
+                    playerData.cards.forEach(card => {
+                        const cardEl = createCardElement(card, -1);
+                        cardContainer.appendChild(cardEl);
+                    });
+                }
+                playerGroup.appendChild(cardContainer);
+                discardWildsResults.appendChild(playerGroup);
+            });
+        }
+        // --- END CHANGE C ---
+        discardWildsModal.style.display = 'flex';
+    });
     socket.on('animateDraw', ({ playerId, count }) => { animateCardDraw(playerId, count); });
     socket.on('animateSwap', ({ p1_id, p2_id }) => { animateHandSwap(p1_id, p2_id); });
     socket.on('animatePlay', ({ playerId, card, cardIndex }) => { animateCardPlay(playerId, card, cardIndex); });
@@ -146,7 +177,7 @@ window.addEventListener('DOMContentLoaded', () => {
         renderPlayers(gameState);
         renderPiles(gameState); // Creates piles and arrow
 
-        // *** Update Direction Arrow Class AND Color (Now Correctly Placed) ***
+        // *** NEW: Update Direction Arrow Class AND Color ***
         const currentDirectionArrow = document.getElementById('direction-arrow');
         if (currentDirectionArrow) {
             // Rotation
@@ -173,6 +204,8 @@ window.addEventListener('DOMContentLoaded', () => {
         } else {
              console.error("Direction arrow element not found after renderPiles");
         }
+        // *** End NEW ***
+
 
         const myPlayer = gameState.players.find(p => p.playerId === myPersistentPlayerId);
         if (!myPlayer) { showToast("You have been removed from the game."); sessionStorage.clear(); setTimeout(() => location.reload(), 1500); return; }
@@ -216,15 +249,16 @@ window.addEventListener('DOMContentLoaded', () => {
         drawPileWrapper.appendChild(cardBackElement);
         pilesContainer.appendChild(drawPileWrapper); // Add draw pile to container FIRST
 
-        // *** Create and add the SVG arrow element ***
+        // *** NEW: Create and add the SVG arrow element ***
         const arrowElement = document.createElement('div');
         arrowElement.id = 'direction-arrow';
-        // *** MODIFIED: SVG for a THICKER arrow pointing down ***
+        // --- CHANGE A: Thicker, more prominent arrow SVG ---
         arrowElement.innerHTML = `
             <svg viewBox="0 0 100 220" preserveAspectRatio="xMidYMid meet" style="width: 100%; height: 100%; filter: drop-shadow(1px 1px 2px black);">
-                <path d="M50 210 L90 160 L70 160 L70 10 L30 10 L30 160 L10 160 Z" />
+                <path d="M50 210 L95 170 L80 170 L80 10 L20 10 L20 170 L5 170 Z" />
             </svg>
         `;
+        // --- END CHANGE A ---
         pilesContainer.appendChild(arrowElement); // Add arrow BETWEEN piles
 
         // Discard Pile
