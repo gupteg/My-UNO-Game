@@ -60,7 +60,6 @@ window.addEventListener('DOMContentLoaded', () => {
     const discardWildsResults = document.getElementById('discard-wilds-results');
     const discardWildsOkBtn = document.getElementById('discard-wilds-ok-btn');
 
-
     joinScreen.style.display = 'block';
     lobbyScreen.style.display = 'none';
     gameBoard.style.display = 'none';
@@ -105,17 +104,41 @@ window.addEventListener('DOMContentLoaded', () => {
     socket.on('lobbyUpdate', (players) => { console.log('Received lobbyUpdate from server.'); if (isGameOver) return; if (!window.gameState || window.gameState.phase === 'Lobby' || window.gameState.phase === 'GameOver') { renderLobby(players); joinScreen.style.display = 'none'; gameBoard.style.display = 'none'; lobbyScreen.style.display = 'block'; } });
     socket.on('updateGameState', (gameState) => { window.gameState = gameState; if (gameState.phase === 'Lobby') { console.warn("Received gameState update with phase 'Lobby', rendering lobby."); renderLobby(gameState.players); joinScreen.style.display = 'none'; gameBoard.style.display = 'none'; lobbyScreen.style.display = 'block'; } else if (gameState.phase === 'GameOver') { /* Do nothing */ } else { joinScreen.style.display = 'none'; lobbyScreen.style.display = 'none'; gameBoard.style.display = 'flex'; displayGame(gameState); } });
     socket.on('announceRoundWinner', ({ winnerNames }) => { let message = `${winnerNames} wins the round!`; if (winnerNames.includes(' and ')) { message = `${winnerNames} win the round!`; } showUnoAnnouncement(message); });
-    socket.on('roundOver', ({ winnerName, scores, finalGameState }) => { window.gameState = finalGameState; setTimeout(() => { displayGame(finalGameState); document.getElementById('winner-message').textContent = `${winnerName} win(s) the round!`; const scoresDisplay = document.getElementById('scores-display'); scoresDisplay.innerHTML = '<h3>Round Scores</h3>'; const scoreTable = document.createElement('table'); scoreTable.className = 'score-table'; let tableHTML = '<thead><tr><th>Player</th><th>Hand Score</th><th>Total Score</th></tr></thead><tbody>'; finalGameState.players.sort((a,b) => a.score - b.score).forEach(p => { const roundScoreForPlayer = p.scoresByRound[p.scoresByRound.length - 1]; const isWinner = winnerName.includes(p.name); tableHTML += `<tr class="${isWinner ? 'winner-row' : ''}"><td>${p.name}</td><td>${roundScoreForPlayer}</td><td>${p.score}</td></tr>`; }); tableHTML += '</tbody>'; scoreTable.innerHTML = tableHTML; scoresDisplay.appendChild(scoreTable); const myPlayer = finalGameState.players.find(p => p.playerId === myPersistentPlayerId); if (myPlayer && myPlayer.isHost) { hostRoundEndControls.style.display = 'flex'; nextRoundOkBtn.style.display = 'none'; nextRoundBtn.disabled = false; nextRoundBtn.textContent = 'Start Next Round'; } else { hostRoundEndControls.style.display = 'none'; nextRoundOkBtn.style.display = 'block'; } endOfRoundDiv.style.display = 'flex'; }, 1500); });
-    socket.on('finalGameOver', (finalGameState) => { isGameOver = true; window.gameState = finalGameState; gameBoard.style.display = 'none'; endOfRoundDiv.style.display = 'none'; renderFinalScores(finalGameState); finalScoreModal.style.display = 'flex'; });
 
-    socket.on('drawnWildCard', ({ cardIndex, drawnCard }) => {
-        // *** FIX: Removed local hand update and displayGame call ***
-        // The UI should already be updated from the private 'updateGameState'
-        // Just show the modal
-        drawnWildModal.dataset.cardIndex = cardIndex;
-        drawnWildModal.style.display = 'flex';
-    });
+    socket.on('roundOver', ({ winnerName, scores, finalGameState }) => {
+        window.gameState = finalGameState;
+        setTimeout(() => {
+            // *** FIX: Ensure buttons are hidden by default before showing correct one ***
+            hostRoundEndControls.style.display = 'none';
+            nextRoundOkBtn.style.display = 'none';
 
+            displayGame(finalGameState); // Render final state (which shows the modal based on phase)
+
+            document.getElementById('winner-message').textContent = `${winnerName} win(s) the round!`;
+            const scoresDisplay = document.getElementById('scores-display'); scoresDisplay.innerHTML = '<h3>Round Scores</h3>'; const scoreTable = document.createElement('table'); scoreTable.className = 'score-table'; let tableHTML = '<thead><tr><th>Player</th><th>Hand Score</th><th>Total Score</th></tr></thead><tbody>'; finalGameState.players.sort((a,b) => a.score - b.score).forEach(p => { const roundScoreForPlayer = p.scoresByRound[p.scoresByRound.length - 1]; const isWinner = winnerName.includes(p.name); tableHTML += `<tr class="${isWinner ? 'winner-row' : ''}"><td>${p.name}</td><td>${roundScoreForPlayer}</td><td>${p.score}</td></tr>`; }); tableHTML += '</tbody>'; scoreTable.innerHTML = tableHTML; scoresDisplay.appendChild(scoreTable);
+
+            const myPlayer = finalGameState.players.find(p => p.playerId === myPersistentPlayerId);
+            // Add console logs for debugging
+            console.log("RoundOver: myPlayer found?", !!myPlayer);
+            if (myPlayer) {
+                console.log("RoundOver: Am I host?", myPlayer.isHost);
+                if (myPlayer.isHost) {
+                    hostRoundEndControls.style.display = 'flex'; // Show host buttons
+                    nextRoundBtn.disabled = false;
+                    nextRoundBtn.textContent = 'Start Next Round';
+                } else {
+                    nextRoundOkBtn.style.display = 'block'; // Show player OK button
+                }
+            } else {
+                console.error("RoundOver: Could not find myPlayer!");
+            }
+            // displayGame already shows the modal based on phase, no need to show again
+            // endOfRoundDiv.style.display = 'flex';
+        }, 1500);
+     });
+
+    socket.on('finalGameOver', (finalGameState) => { /* ... (unchanged) ... */ isGameOver = true; window.gameState = finalGameState; gameBoard.style.display = 'none'; endOfRoundDiv.style.display = 'none'; renderFinalScores(finalGameState); finalScoreModal.style.display = 'flex'; });
+    socket.on('drawnWildCard', ({ cardIndex, drawnCard }) => { /* ... (FIX applied - unchanged from previous) ... */ drawnWildModal.dataset.cardIndex = cardIndex; drawnWildModal.style.display = 'flex'; });
     socket.on('announce', (message) => { showToast(message); });
     socket.on('youWereMarkedAFK', () => { afkNotificationModal.style.display = 'flex'; });
     socket.on('unoCalled', ({ playerName }) => { showUnoAnnouncement(`${playerName} says UNO!`); });
@@ -132,7 +155,7 @@ window.addEventListener('DOMContentLoaded', () => {
     function showUnoAnnouncement(message) { /* ... (unchanged) ... */ unoAnnouncementText.textContent = message; if (message.length > 10) { unoAnnouncementText.style.fontSize = '8vw'; } else { unoAnnouncementText.style.fontSize = '15vw'; } unoAnnouncementOverlay.classList.add('show'); setTimeout(() => { unoAnnouncementOverlay.classList.remove('show'); }, 1900); }
     function isClientMoveValid(playedCard, gameState) { /* ... (unchanged) ... */ if (!gameState || !gameState.discardPile || gameState.discardPile.length === 0) return false; const topDiscard = gameState.discardPile[0]; if (!topDiscard || !topDiscard.card) return false; const topCard = topDiscard.card; const activeColor = gameState.activeColor; const drawPenalty = gameState.drawPenalty; if (drawPenalty > 0) { return playedCard.value === topCard.value; } if (playedCard.color === 'Black') return true; if (playedCard.color === activeColor || playedCard.value === topCard.value) return true; return false; }
     function triggerInvalidMoveFeedback(cardElement) { /* ... (unchanged) ... */ cardElement.classList.add('invalid-shake'); const cardRect = cardElement.getBoundingClientRect(); const boardRect = gameBoard.getBoundingClientRect(); invalidMoveCallout.style.top = `${cardRect.top - boardRect.top - 40}px`; invalidMoveCallout.style.left = `${cardRect.left - boardRect.left + (cardRect.width / 2) - (invalidMoveCallout.offsetWidth / 2)}px`; invalidMoveCallout.classList.add('show'); setTimeout(() => { cardElement.classList.remove('invalid-shake'); }, 500); setTimeout(() => { invalidMoveCallout.classList.remove('show'); }, 1500); }
-    function animateCardPlay(playerId, card, cardIndex) { /* ... (unchanged) ... */ const discardPileEl = document.querySelector('#discard-pile-dropzone .card'); const playerAreaEl = document.querySelector(`[data-player-id="${playerId}"]`); if (!discardPileEl || !playerAreaEl) return; const startRect = playerAreaEl.getBoundingClientRect(); const endRect = discardPileEl.getBoundingClientRect(); const boardRect = gameBoard.getBoundingClientRect(); const clone = createCardElement(card, -1); clone.classList.add('flying-card'); clone.style.top = `${startRect.top - boardRect.top + (startRect.height / 2) - 60}px`; clone.style.left = `${startRect.left - boardRect.left + (startRect.width / 2) - 40}px`; clone.style.width = '80px'; clone.style.height = '120px'; if (playerId === myPersistentPlayerId && window.gameState) { const myPlayer = window.gameState.players.find(p => p.playerId === myPersistentPlayerId); if (myPlayer) { /* Try finding by index if available, else approximate */ const cardToHide = playerAreaEl.querySelector(`.card[data-card-index="${cardIndex}"]`); if(cardToHide) cardToHide.style.visibility = 'hidden'; else { /* Fallback for animations where index might be off */ const cards = playerAreaEl.querySelectorAll('.card-container .card'); if (cards.length > 0) cards[cards.length - 1].style.visibility = 'hidden'; } } } gameBoard.appendChild(clone); requestAnimationFrame(() => { clone.style.top = `${endRect.top - boardRect.top}px`; clone.style.left = `${endRect.left - boardRect.left}px`; clone.style.transform = `rotate(360deg)`; clone.style.width = `${endRect.width}px`; clone.style.height = `${endRect.height}px`; }); setTimeout(() => { clone.remove(); }, 800); }
+    function animateCardPlay(playerId, card, cardIndex) { /* ... (unchanged) ... */ const discardPileEl = document.querySelector('#discard-pile-dropzone .card'); const playerAreaEl = document.querySelector(`[data-player-id="${playerId}"]`); if (!discardPileEl || !playerAreaEl) return; const startRect = playerAreaEl.getBoundingClientRect(); const endRect = discardPileEl.getBoundingClientRect(); const boardRect = gameBoard.getBoundingClientRect(); const clone = createCardElement(card, -1); clone.classList.add('flying-card'); clone.style.top = `${startRect.top - boardRect.top + (startRect.height / 2) - 60}px`; clone.style.left = `${startRect.left - boardRect.left + (startRect.width / 2) - 40}px`; clone.style.width = '80px'; clone.style.height = '120px'; if (playerId === myPersistentPlayerId && window.gameState) { const myPlayer = window.gameState.players.find(p => p.playerId === myPersistentPlayerId); if (myPlayer) { const cardToHide = playerAreaEl.querySelector(`.card[data-card-index="${cardIndex}"]`); if(cardToHide) cardToHide.style.visibility = 'hidden'; else { const cards = playerAreaEl.querySelectorAll('.card-container .card'); if (cards.length > 0) cards[cards.length - 1].style.visibility = 'hidden'; } } } gameBoard.appendChild(clone); requestAnimationFrame(() => { clone.style.top = `${endRect.top - boardRect.top}px`; clone.style.left = `${endRect.left - boardRect.left}px`; clone.style.transform = `rotate(360deg)`; clone.style.width = `${endRect.width}px`; clone.style.height = `${endRect.height}px`; }); setTimeout(() => { clone.remove(); }, 800); }
     function animateCardDraw(playerId, count) { /* ... (unchanged) ... */ const drawPileEl = document.querySelector('.piles-container .card-back'); const playerAreaEl = document.querySelector(`[data-player-id="${playerId}"] .card-container`); if (!drawPileEl || !playerAreaEl) return; const startRect = drawPileEl.getBoundingClientRect(); const endRect = playerAreaEl.getBoundingClientRect(); const boardRect = gameBoard.getBoundingClientRect(); const smallCardWidth = 80; const scaleFactor = smallCardWidth / startRect.width; for (let i = 0; i < count; i++) { const cardBack = document.createElement('div'); cardBack.className = 'card card-back flying-card'; cardBack.style.top = `${startRect.top - boardRect.top}px`; cardBack.style.left = `${startRect.left - boardRect.top}px`; cardBack.style.width = `${startRect.width}px`; cardBack.style.height = `${startRect.height}px`; cardBack.style.transform = 'scale(1.2)'; gameBoard.appendChild(cardBack); setTimeout(() => { requestAnimationFrame(() => { const top = `${endRect.top - boardRect.top + 10}px`; const left = `${endRect.left - boardRect.left + (i * (smallCardWidth / 4))}px`; cardBack.style.transform = `scale(${scaleFactor})`; cardBack.style.top = top; cardBack.style.left = left; cardBack.style.width = `${smallCardWidth}px`; cardBack.style.height = `${smallCardWidth * 1.5}px`; }); }, i * 100 + 50); setTimeout(() => { cardBack.remove(); }, 800 + (i * 100)); } }
     function animateHandSwap(p1_id, p2_id) { /* ... (unchanged) ... */ const p1_area = document.querySelector(`[data-player-id="${p1_id}"]`); const p2_area = document.querySelector(`[data-player-id="${p2_id}"]`); if (!p1_area || !p2_area) return; const p1_cards = p1_area.querySelectorAll('.card-container .card'); const p2_cards = p2_area.querySelectorAll('.card-container .card'); const boardRect = gameBoard.getBoundingClientRect(); const animateHand = (cards, toArea) => { const endRect = toArea.querySelector('.card-container').getBoundingClientRect(); const clones = []; cards.forEach(card => { const startRect = card.getBoundingClientRect(); const clone = card.cloneNode(true); clone.classList.add('flying-card'); clone.style.top = `${startRect.top - boardRect.top}px`; clone.style.left = `${startRect.left - boardRect.left}px`; gameBoard.appendChild(clone); clones.push(clone); card.style.visibility = 'hidden'; }); clones.forEach((clone, i) => { setTimeout(() => { requestAnimationFrame(() => { const top = `${endRect.top - boardRect.top + 10}px`; const left = `${endRect.left - boardRect.left + (i * 20)}px`; clone.style.top = top; clone.style.left = left; }); }, i * 50); setTimeout(() => clone.remove(), 800 + (i*50)); }); }; animateHand(p1_cards, p2_area); animateHand(p2_cards, p1_area); }
     function addMessageToGameLog(message) { /* ... (unchanged) ... */ if (!gameLogList) return; const li = document.createElement('li'); li.textContent = message; gameLogList.prepend(li); while (gameLogList.children.length > 8) { gameLogList.lastChild.remove(); } }
@@ -141,78 +164,7 @@ window.addEventListener('DOMContentLoaded', () => {
     function makeDraggable(element) { /* ... (unchanged) ... */ let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0; const header = element.querySelector('.modal-content h3, .modal-content h2, .modal-content p'); function dragMouseDown(e) { e.preventDefault(); pos3 = e.clientX; pos4 = e.clientY; document.onmouseup = closeDragElement; document.onmousemove = elementDrag; } function touchDown(e) { pos3 = e.touches[0].clientX; pos4 = e.touches[0].clientY; document.ontouchend = closeDragElement; document.ontouchmove = elementTouchDrag; } function elementDrag(e) { e.preventDefault(); pos1 = pos3 - e.clientX; pos2 = pos4 - e.clientY; pos3 = e.clientX; pos4 = e.clientY; let newTop = element.offsetTop - pos2; let newLeft = element.offsetLeft - pos1; element.style.top = newTop + "px"; element.style.left = newLeft + "px"; } function elementTouchDrag(e) { e.preventDefault(); pos1 = pos3 - e.touches[0].clientX; pos2 = pos4 - e.touches[0].clientY; pos3 = e.touches[0].clientX; pos4 = e.touches[0].clientY; let newTop = element.offsetTop - pos2; let newLeft = element.offsetLeft - pos1; element.style.top = newTop + "px"; element.style.left = newLeft + "px"; } function closeDragElement() { document.onmouseup = null; document.onmousemove = null; document.ontouchend = null; document.ontouchmove = null; } if (header) { header.style.cursor = 'move'; header.onmousedown = dragMouseDown; header.ontouchstart = touchDown; } else { const content = element.querySelector('.modal-content'); if (content) { content.style.cursor = 'move'; content.onmousedown = dragMouseDown; content.ontouchstart = touchDown; } } }
 
     // --- MAIN DISPLAY FUNCTION (REFACTORED) ---
-    function displayGame(gameState) {
-        window.gameState = gameState; // Keep global reference
-
-        if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
-
-        // Hide all modals initially, then show the correct one based on phase
-        colorPickerModal.style.display = 'none';
-        pickUntilModal.style.display = 'none';
-        dealChoiceModal.style.display = 'none';
-        endOfRoundDiv.style.display = 'none';
-        finalScoreModal.style.display = 'none';
-        swapModal.style.display = 'none';
-        drawnWildModal.style.display = 'none'; // Also hide this, it's shown by event
-
-        renderPlayers(gameState); // Render players first (sets up structure)
-        renderPiles(gameState); // Render piles and arrow
-        updateDirectionArrow(gameState); // Update arrow color/rotation
-
-        const myPlayer = gameState.players.find(p => p.playerId === myPersistentPlayerId);
-        if (!myPlayer) { showToast("Error: Could not find your player data."); return; }
-
-        const currentPlayer = gameState.players[gameState.currentPlayerIndex];
-        const playerChoosingAction = gameState.players.find(p => p.playerId === gameState.playerChoosingActionId);
-        const isMyTurn = myPlayer && currentPlayer?.playerId === myPlayer.playerId;
-        const amIChoosingAction = myPlayer && playerChoosingAction?.playerId === myPlayer.playerId;
-        const isPaused = gameState.isPaused;
-        const isHost = myPlayer.isHost;
-
-        // --- Action Bar Text ---
-        if (actionBar) { actionBar.textContent = getActionBarText(gameState, currentPlayer, playerChoosingAction); }
-
-        // --- Show/Hide Modals based on Phase ---
-        switch (gameState.phase) {
-            case 'ChoosingColor':
-                if (amIChoosingAction && !isPaused) colorPickerModal.style.display = 'flex';
-                break;
-            case 'ChoosingPickUntilAction':
-                if (amIChoosingAction && !isPaused) pickUntilModal.style.display = 'flex';
-                break;
-            case 'ChoosingSwapHands':
-                if (amIChoosingAction && !isPaused) {
-                    const swapOptions = document.getElementById('swap-player-options'); swapOptions.innerHTML = '';
-                    gameState.players.forEach(player => { if (player.playerId !== myPersistentPlayerId && player.status === 'Active') { const button = document.createElement('button'); button.textContent = player.name; button.className = 'player-swap-btn'; button.dataset.playerId = player.playerId; swapOptions.appendChild(button); } });
-                    swapModal.style.display = 'flex';
-                }
-                break;
-            case 'Dealing':
-                if (amIChoosingAction && !isPaused) dealChoiceModal.style.display = 'flex';
-                break;
-            case 'RoundOver':
-                // The roundOver event handler shows this modal after a delay
-                // displayGame might be called before the delay finishes, so don't hide it if it should be visible
-                if (endOfRoundDiv.style.display !== 'flex') {
-                     // Ensure it's hidden if the round just ended but modal isn't ready
-                     endOfRoundDiv.style.display = 'none';
-                }
-                break;
-            case 'GameOver':
-                // The finalGameOver event handler shows this modal
-                break;
-             // case 'Playing': // No modal needed
-             // default: // Hide all handled above
-        }
-
-        // --- Button States ---
-        endGameBtn.style.display = (isHost && gameState.phase !== 'RoundOver' && gameState.phase !== 'GameOver') ? 'block' : 'none';
-
-        if (unoBtn) { /* ... (UNO button logic unchanged) ... */ const colorMap = { "Red": "#ff5555", "Green": "#55aa55", "Blue": "#5555ff", "Yellow": "#ffaa00" }; unoBtn.style.backgroundColor = colorMap[gameState.activeColor] || '#333'; const canDeclareUno = isMyTurn && gameState.phase === 'Playing' && myPlayer.hand.length === 2 && !isPaused; unoBtn.disabled = !canDeclareUno; unoBtn.classList.toggle('uno-ready', canDeclareUno); }
-
-        if (drawCardBtn) { /* ... (Draw button logic unchanged) ... */ let drawBtnText = 'DRAW CARD'; let drawBtnDisabled = true; if (!isPaused && gameState.phase === 'Playing') { if (isMyTurn) { const pickUntilInfo = gameState.pickUntilState; const isPickingUntil = pickUntilInfo?.active && pickUntilInfo.targetPlayerIndex === gameState.currentPlayerIndex; if (isPickingUntil) { drawBtnText = `${currentPlayer.name} PICKS FOR ${pickUntilInfo.targetColor.toUpperCase()}`; drawBtnDisabled = false; } else if (gameState.drawPenalty > 0) { drawBtnText = `${currentPlayer.name} DRAWS ${gameState.drawPenalty}`; drawBtnDisabled = false; } else { drawBtnText = 'DRAW CARD'; drawBtnDisabled = false; } } else { drawBtnDisabled = true; const pickUntilInfo = gameState.pickUntilState; const isPickingUntil = pickUntilInfo?.active && pickUntilInfo.targetPlayerIndex === gameState.currentPlayerIndex; if(isPickingUntil) { drawBtnText = `${currentPlayer?.name} PICKS FOR ${pickUntilInfo.targetColor.toUpperCase()}`; } else if (gameState.drawPenalty > 0 && gameState.currentPlayerIndex === gameState.players.findIndex(p => p.playerId === currentPlayer?.playerId)) { drawBtnText = `${currentPlayer?.name} DRAWS ${gameState.drawPenalty}`; } else { drawBtnText = 'DRAW CARD'; } } } else { drawBtnDisabled = true; drawBtnText = 'DRAW CARD'; } drawCardBtn.textContent = drawBtnText; drawCardBtn.disabled = drawBtnDisabled; }
-    }
-
+    function displayGame(gameState) { /* ... (Mostly unchanged, phase logic handles modals/buttons) ... */ window.gameState = gameState; if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; } colorPickerModal.style.display = 'none'; pickUntilModal.style.display = 'none'; dealChoiceModal.style.display = 'none'; endOfRoundDiv.style.display = 'none'; finalScoreModal.style.display = 'none'; swapModal.style.display = 'none'; drawnWildModal.style.display = 'none'; renderPlayers(gameState); renderPiles(gameState); updateDirectionArrow(gameState); const myPlayer = gameState.players.find(p => p.playerId === myPersistentPlayerId); if (!myPlayer) { showToast("Error: Could not find your player data."); return; } const currentPlayer = gameState.players[gameState.currentPlayerIndex]; const playerChoosingAction = gameState.players.find(p => p.playerId === gameState.playerChoosingActionId); const isMyTurn = myPlayer && currentPlayer?.playerId === myPlayer.playerId; const amIChoosingAction = myPlayer && playerChoosingAction?.playerId === myPlayer.playerId; const isPaused = gameState.isPaused; const isHost = myPlayer.isHost; if (actionBar) { actionBar.textContent = getActionBarText(gameState, currentPlayer, playerChoosingAction); } switch (gameState.phase) { case 'ChoosingColor': if (amIChoosingAction && !isPaused) colorPickerModal.style.display = 'flex'; break; case 'ChoosingPickUntilAction': if (amIChoosingAction && !isPaused) pickUntilModal.style.display = 'flex'; break; case 'ChoosingSwapHands': if (amIChoosingAction && !isPaused) { const swapOptions = document.getElementById('swap-player-options'); swapOptions.innerHTML = ''; gameState.players.forEach(player => { if (player.playerId !== myPersistentPlayerId && player.status === 'Active') { const button = document.createElement('button'); button.textContent = player.name; button.className = 'player-swap-btn'; button.dataset.playerId = player.playerId; swapOptions.appendChild(button); } }); swapModal.style.display = 'flex'; } break; case 'Dealing': if (amIChoosingAction && !isPaused) dealChoiceModal.style.display = 'flex'; break; case 'RoundOver': if (endOfRoundDiv.style.display !== 'flex') { endOfRoundDiv.style.display = 'none'; } break; } endGameBtn.style.display = (isHost && gameState.phase !== 'RoundOver' && gameState.phase !== 'GameOver') ? 'block' : 'none'; if (unoBtn) { const colorMap = { "Red": "#ff5555", "Green": "#55aa55", "Blue": "#5555ff", "Yellow": "#ffaa00" }; unoBtn.style.backgroundColor = colorMap[gameState.activeColor] || '#333'; const canDeclareUno = isMyTurn && gameState.phase === 'Playing' && myPlayer.hand.length === 2 && !isPaused; unoBtn.disabled = !canDeclareUno; unoBtn.classList.toggle('uno-ready', canDeclareUno); } if (drawCardBtn) { let drawBtnText = 'DRAW CARD'; let drawBtnDisabled = true; if (!isPaused && gameState.phase === 'Playing') { if (isMyTurn) { const pickUntilInfo = gameState.pickUntilState; const isPickingUntil = pickUntilInfo?.active && pickUntilInfo.targetPlayerIndex === gameState.currentPlayerIndex; if (isPickingUntil) { drawBtnText = `${currentPlayer.name} PICKS FOR ${pickUntilInfo.targetColor.toUpperCase()}`; drawBtnDisabled = false; } else if (gameState.drawPenalty > 0) { drawBtnText = `${currentPlayer.name} DRAWS ${gameState.drawPenalty}`; drawBtnDisabled = false; } else { drawBtnText = 'DRAW CARD'; drawBtnDisabled = false; } } else { drawBtnDisabled = true; const pickUntilInfo = gameState.pickUntilState; const isPickingUntil = pickUntilInfo?.active && pickUntilInfo.targetPlayerIndex === gameState.currentPlayerIndex; if(isPickingUntil) { drawBtnText = `${currentPlayer?.name} PICKS FOR ${pickUntilInfo.targetColor.toUpperCase()}`; } else if (gameState.drawPenalty > 0 && gameState.currentPlayerIndex === gameState.players.findIndex(p => p.playerId === currentPlayer?.playerId)) { drawBtnText = `${currentPlayer?.name} DRAWS ${gameState.drawPenalty}`; } else { drawBtnText = 'DRAW CARD'; } } } else { drawBtnDisabled = true; drawBtnText = 'DRAW CARD'; } drawCardBtn.textContent = drawBtnText; drawCardBtn.disabled = drawBtnDisabled; } }
     // --- Helper for Action Bar Text ---
     function getActionBarText(gameState, currentPlayer, playerChoosingAction) { /* ... (unchanged) ... */ if (gameState.isPaused && gameState.pauseInfo?.pauseEndTime) { const { pauseEndTime, pausedForPlayerNames } = gameState.pauseInfo; const names = pausedForPlayerNames.join(', '); const updateTimer = () => { const remaining = Math.max(0, Math.floor((pauseEndTime - Date.now()) / 1000)); actionBar.textContent = `Waiting ${remaining}s for ${names} to rejoin...`; if (!countdownInterval && remaining > 0) { countdownInterval = setInterval(updateTimer, 1000); } else if (remaining <= 0 && countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; } }; updateTimer(); return actionBar.textContent; } if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; } switch(gameState.phase) { case 'Lobby': return "Waiting for players..."; case 'Dealing': return playerChoosingAction ? `Waiting for ${playerChoosingAction.name} (Dealer) to deal...` : 'Waiting for dealer...'; case 'Playing': if (gameState.pickUntilState?.active && gameState.pickUntilState.targetPlayerIndex === gameState.currentPlayerIndex) { return `${currentPlayer.name} must pick until they find a ${gameState.pickUntilState.targetColor}!`; } else if (gameState.drawPenalty > 0 && gameState.currentPlayerIndex === gameState.players.findIndex(p => p.playerId === currentPlayer?.playerId)) { return `${currentPlayer.name} must draw ${gameState.drawPenalty}!`; } return currentPlayer ? `Waiting for ${currentPlayer.name} to play...` : 'Waiting for player...'; case 'ChoosingColor': return playerChoosingAction ? `${playerChoosingAction.name} is choosing a color...` : 'Choosing a color...'; case 'ChoosingPickUntilAction': return playerChoosingAction ? `${playerChoosingAction.name} is choosing Wild Pick Until action...` : 'Choosing action...'; case 'ChoosingSwapHands': return playerChoosingAction ? `${playerChoosingAction.name} is choosing who to swap with...` : 'Choosing swap target...'; case 'RoundOver': const host = gameState.players.find(p => p.isHost); const hostIsReady = gameState.readyForNextRound.includes(host?.playerId); const connectedPlayers = gameState.players.filter(p => p.status === 'Active'); const allReady = gameState.readyForNextRound.length === connectedPlayers.length; if (hostIsReady && !allReady) { const waitingOnPlayers = connectedPlayers.filter(p => !gameState.readyForNextRound.includes(p.playerId)); const waitingOnNames = waitingOnPlayers.map(p => p.name).join(', '); return `Waiting for ${waitingOnNames} to click OK...`; } else if (!hostIsReady && allReady) { return `Waiting for ${host?.name} (Host) to start next round...`; } else { return `Round Over! Waiting for players...`; } case 'GameOver': return "Game Over!"; default: return "Loading..."; } }
     // --- Helper to Update Direction Arrow ---
