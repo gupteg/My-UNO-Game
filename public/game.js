@@ -73,144 +73,36 @@ window.addEventListener('DOMContentLoaded', () => {
 
     // --- EVENT LISTENERS (Sending messages to server) ---
     // ... (All existing event listeners remain unchanged) ...
-    joinGameBtn.addEventListener('click', () => {
-        const playerName = playerNameInput.value.trim();
-        if (playerName) {
-            socket.emit('joinGame', { playerName, playerId: myPersistentPlayerId });
-        } else {
-            alert('Please enter your name.');
-        }
-    });
-    playerList.addEventListener('click', (event) => {
-        if (event.target.classList.contains('kick-btn')) {
-            const playerIdToKick = event.target.dataset.playerId;
-            socket.emit('kickPlayer', { playerIdToKick });
-        }
-    });
-    document.getElementById('left-column').addEventListener('click', (event) => {
-        if (event.target.classList.contains('mark-afk-btn')) {
-            playerIdToMarkAFK = event.target.dataset.playerId;
-            const player = window.gameState?.players.find(p => p.playerId === playerIdToMarkAFK);
-            if (player) {
-                confirmAfkPlayerName.textContent = player.name;
-                confirmAfkModal.style.display = 'flex';
-            }
-        }
-    });
-    confirmAfkYesBtn.addEventListener('click', () => {
-        if (playerIdToMarkAFK) {
-            socket.emit('markPlayerAFK', { playerIdToMark: playerIdToMarkAFK });
-        }
-        confirmAfkModal.style.display = 'none';
-        playerIdToMarkAFK = null;
-    });
-    confirmAfkNoBtn.addEventListener('click', () => {
-        confirmAfkModal.style.display = 'none';
-        playerIdToMarkAFK = null;
-    });
-    imBackBtn.addEventListener('click', () => {
-        socket.emit('playerIsBack');
-        afkNotificationModal.style.display = 'none';
-    });
+    joinGameBtn.addEventListener('click', () => { const playerName = playerNameInput.value.trim(); if (playerName) { socket.emit('joinGame', { playerName, playerId: myPersistentPlayerId }); } else { alert('Please enter your name.'); } });
+    playerList.addEventListener('click', (event) => { if (event.target.classList.contains('kick-btn')) { const playerIdToKick = event.target.dataset.playerId; socket.emit('kickPlayer', { playerIdToKick }); } });
+    document.getElementById('left-column').addEventListener('click', (event) => { if (event.target.classList.contains('mark-afk-btn')) { playerIdToMarkAFK = event.target.dataset.playerId; const player = window.gameState?.players.find(p => p.playerId === playerIdToMarkAFK); if (player) { confirmAfkPlayerName.textContent = player.name; confirmAfkModal.style.display = 'flex'; } } });
+    confirmAfkYesBtn.addEventListener('click', () => { if (playerIdToMarkAFK) { socket.emit('markPlayerAFK', { playerIdToMark: playerIdToMarkAFK }); } confirmAfkModal.style.display = 'none'; playerIdToMarkAFK = null; });
+    confirmAfkNoBtn.addEventListener('click', () => { confirmAfkModal.style.display = 'none'; playerIdToMarkAFK = null; });
+    imBackBtn.addEventListener('click', () => { socket.emit('playerIsBack'); afkNotificationModal.style.display = 'none'; });
     startGameBtn.addEventListener('click', () => { socket.emit('startGame'); });
     drawCardBtn.addEventListener('click', () => { socket.emit('drawCard'); });
     endGameBtn.addEventListener('click', () => { confirmEndGameModal.style.display = 'flex'; });
     endGameRoundBtn.addEventListener('click', () => { confirmEndGameModal.style.display = 'flex'; });
     confirmEndNoBtn.addEventListener('click', () => { confirmEndGameModal.style.display = 'none'; });
-    confirmEndYesBtn.addEventListener('click', () => {
-        confirmEndGameModal.style.display = 'none';
-        socket.emit('endGame');
-    });
-    finalScoreOkBtn.addEventListener('click', () => {
-        isGameOver = false;
-        finalScoreModal.style.display = 'none';
-        gameBoard.style.display = 'none';
-        lobbyScreen.style.display = 'none';
-        joinScreen.style.display = 'block';
-        sessionStorage.clear();
-        myPersistentPlayerId = null;
-    });
-    unoBtn.addEventListener('click', () => {
-        socket.emit('callUno');
-        unoBtn.classList.add('pressed');
-        setTimeout(() => unoBtn.classList.remove('pressed'), 300);
-    });
-    nextRoundBtn.addEventListener('click', () => {
-        socket.emit('playerReadyForNextRound');
-        nextRoundBtn.disabled = true;
-        nextRoundBtn.textContent = 'Waiting...';
-    });
-    nextRoundOkBtn.addEventListener('click', () => {
-        socket.emit('playerReadyForNextRound');
-        endOfRoundDiv.style.display = 'none';
-    });
-    dealCardsBtn.addEventListener('click', () => {
-        const numCards = dealCardsInput.value;
-        socket.emit('dealChoice', { numCards });
-    });
-    colorPickerModal.addEventListener('click', (event) => {
-        if (event.target.matches('.color-btn')) {
-            const color = event.target.dataset.color;
-            socket.emit('colorChosen', { color });
-        }
-    });
-    drawnWildModal.addEventListener('click', (event) => {
-        const cardIndex = parseInt(drawnWildModal.dataset.cardIndex);
-        if (event.target.id === 'option-play-wild') {
-            socket.emit('choosePlayDrawnWild', { play: true, cardIndex });
-        } else if (event.target.id === 'option-keep-wild') {
-            socket.emit('choosePlayDrawnWild', { play: false, cardIndex });
-        }
-        drawnWildModal.style.display = 'none';
-    });
-    pickUntilModal.addEventListener('click', (event) => {
-        let choice = null;
-        if (event.target.id === 'option-pick-color') {
-            choice = 'pick-color';
-        } else if (event.target.id === 'option-discard-wilds') {
-            choice = 'discard-wilds';
-        }
-        if (choice) {
-            socket.emit('pickUntilChoice', { choice });
-        }
-        pickUntilModal.style.display = 'none';
-    });
-    swapModal.addEventListener('click', (event) => {
-        if (event.target.matches('.player-swap-btn')) {
-            const targetPlayerId = event.target.dataset.playerId;
-            socket.emit('swapHandsChoice', { targetPlayerId });
-            swapModal.style.display = 'none';
-        }
-    });
-    arrangeHandBtn.addEventListener('click', () => {
-        const myPlayer = window.gameState?.players.find(p => p.playerId === myPersistentPlayerId);
-        if (!myPlayer) return;
-        const colorOrder = { 'Black': 0, 'Blue': 1, 'Green': 2, 'Red': 3, 'Yellow': 4 };
-        const valueOrder = { 'Draw Two': 12, 'Skip': 11, 'Reverse': 10, '9': 9, '8': 8, '7': 7, '6': 6, '5': 5, '4': 4, '3': 3, '2': 2, '1': 1, '0': 0, 'Wild': -1, 'Wild Draw Four': -1, 'Wild Pick Until': -1, 'Wild Swap': -1 };
-        const sortedHand = [...myPlayer.hand].sort((a, b) => { const colorComparison = colorOrder[a.color] - colorOrder[b.color]; if (colorComparison !== 0) { return colorComparison; } return valueOrder[b.value] - valueOrder[a.value]; });
-        myPlayer.hand = sortedHand;
-        socket.emit('rearrangeHand', { newHand: sortedHand });
-        displayGame(window.gameState);
-    });
-    showDiscardPileBtn.addEventListener('click', () => {
-        if (!window.gameState) return;
-        const lastTenDiscards = window.gameState.discardPile.slice(0, 10);
-        discardPileList.innerHTML = '';
-        if (lastTenDiscards.length === 0) { discardPileList.innerHTML = '<p>The discard pile is empty.</p>'; } else { lastTenDiscards.forEach(item => { const discardItemDiv = document.createElement('div'); discardItemDiv.className = 'discard-item'; const playerP = document.createElement('p'); playerP.className = 'discard-item-player'; playerP.textContent = `Played by: ${item.playerName}`; if (item.card) { const cardEl = createCardElement(item.card, -1); discardItemDiv.appendChild(cardEl); discardItemDiv.appendChild(playerP); discardPileList.appendChild(discardItemDiv); } else { console.warn("Discard pile item missing card data:", item); } }); }
-        discardPileModal.style.display = 'flex';
-    });
+    confirmEndYesBtn.addEventListener('click', () => { confirmEndGameModal.style.display = 'none'; socket.emit('endGame'); });
+    finalScoreOkBtn.addEventListener('click', () => { isGameOver = false; finalScoreModal.style.display = 'none'; gameBoard.style.display = 'none'; lobbyScreen.style.display = 'none'; joinScreen.style.display = 'block'; sessionStorage.clear(); myPersistentPlayerId = null; });
+    unoBtn.addEventListener('click', () => { socket.emit('callUno'); unoBtn.classList.add('pressed'); setTimeout(() => unoBtn.classList.remove('pressed'), 300); });
+    nextRoundBtn.addEventListener('click', () => { socket.emit('playerReadyForNextRound'); nextRoundBtn.disabled = true; nextRoundBtn.textContent = 'Waiting...'; });
+    nextRoundOkBtn.addEventListener('click', () => { socket.emit('playerReadyForNextRound'); endOfRoundDiv.style.display = 'none'; });
+    dealCardsBtn.addEventListener('click', () => { const numCards = dealCardsInput.value; socket.emit('dealChoice', { numCards }); });
+    colorPickerModal.addEventListener('click', (event) => { if (event.target.matches('.color-btn')) { const color = event.target.dataset.color; socket.emit('colorChosen', { color }); } });
+    drawnWildModal.addEventListener('click', (event) => { const cardIndex = parseInt(drawnWildModal.dataset.cardIndex); if (event.target.id === 'option-play-wild') { socket.emit('choosePlayDrawnWild', { play: true, cardIndex }); } else if (event.target.id === 'option-keep-wild') { socket.emit('choosePlayDrawnWild', { play: false, cardIndex }); } drawnWildModal.style.display = 'none'; });
+    pickUntilModal.addEventListener('click', (event) => { let choice = null; if (event.target.id === 'option-pick-color') { choice = 'pick-color'; } else if (event.target.id === 'option-discard-wilds') { choice = 'discard-wilds'; } if (choice) { socket.emit('pickUntilChoice', { choice }); } pickUntilModal.style.display = 'none'; });
+    swapModal.addEventListener('click', (event) => { if (event.target.matches('.player-swap-btn')) { const targetPlayerId = event.target.dataset.playerId; socket.emit('swapHandsChoice', { targetPlayerId }); swapModal.style.display = 'none'; } });
+    arrangeHandBtn.addEventListener('click', () => { const myPlayer = window.gameState?.players.find(p => p.playerId === myPersistentPlayerId); if (!myPlayer) return; const colorOrder = { 'Black': 0, 'Blue': 1, 'Green': 2, 'Red': 3, 'Yellow': 4 }; const valueOrder = { 'Draw Two': 12, 'Skip': 11, 'Reverse': 10, '9': 9, '8': 8, '7': 7, '6': 6, '5': 5, '4': 4, '3': 3, '2': 2, '1': 1, '0': 0, 'Wild': -1, 'Wild Draw Four': -1, 'Wild Pick Until': -1, 'Wild Swap': -1 }; const sortedHand = [...myPlayer.hand].sort((a, b) => { const colorComparison = colorOrder[a.color] - colorOrder[b.color]; if (colorComparison !== 0) { return colorComparison; } return valueOrder[b.value] - valueOrder[a.value]; }); myPlayer.hand = sortedHand; socket.emit('rearrangeHand', { newHand: sortedHand }); displayGame(window.gameState); });
+    showDiscardPileBtn.addEventListener('click', () => { if (!window.gameState) return; const lastTenDiscards = window.gameState.discardPile.slice(0, 10); discardPileList.innerHTML = ''; if (lastTenDiscards.length === 0) { discardPileList.innerHTML = '<p>The discard pile is empty.</p>'; } else { lastTenDiscards.forEach(item => { const discardItemDiv = document.createElement('div'); discardItemDiv.className = 'discard-item'; const playerP = document.createElement('p'); playerP.className = 'discard-item-player'; playerP.textContent = `Played by: ${item.playerName}`; if (item.card) { const cardEl = createCardElement(item.card, -1); discardItemDiv.appendChild(cardEl); discardItemDiv.appendChild(playerP); discardPileList.appendChild(discardItemDiv); } else { console.warn("Discard pile item missing card data:", item); } }); } discardPileModal.style.display = 'flex'; });
     discardPileOkBtn.addEventListener('click', () => { discardPileModal.style.display = 'none'; });
     discardWildsOkBtn.addEventListener('click', () => { discardWildsModal.style.display = 'none'; });
 
     // --- EVENT LISTENERS (Receiving messages from server) ---
     // ... (All existing socket listeners remain unchanged) ...
-    socket.on('connect', () => {
-        console.log('Socket connected with ID:', socket.id);
-        if (myPersistentPlayerId) { console.log('Attempting to rejoin with existing ID:', myPersistentPlayerId); const savedName = sessionStorage.getItem('unoPlayerName'); const playerName = savedName || playerNameInput.value.trim() || "Player"; if (savedName) { playerNameInput.value = savedName; } socket.emit('joinGame', { playerName, playerId: myPersistentPlayerId }); }
-    });
-    socket.on('joinSuccess', ({ playerId, lobby }) => {
-        console.log('Successfully joined/registered with ID:', playerId); myPersistentPlayerId = playerId; sessionStorage.setItem('unoPlayerId', playerId); const me = lobby.find(p => p.playerId === playerId); if (me) { sessionStorage.setItem('unoPlayerName', me.name); playerNameInput.value = me.name; } renderLobby(lobby);
-    });
+    socket.on('connect', () => { console.log('Socket connected with ID:', socket.id); if (myPersistentPlayerId) { console.log('Attempting to rejoin with existing ID:', myPersistentPlayerId); const savedName = sessionStorage.getItem('unoPlayerName'); const playerName = savedName || playerNameInput.value.trim() || "Player"; if (savedName) { playerNameInput.value = savedName; } socket.emit('joinGame', { playerName, playerId: myPersistentPlayerId }); } });
+    socket.on('joinSuccess', ({ playerId, lobby }) => { console.log('Successfully joined/registered with ID:', playerId); myPersistentPlayerId = playerId; sessionStorage.setItem('unoPlayerId', playerId); const me = lobby.find(p => p.playerId === playerId); if (me) { sessionStorage.setItem('unoPlayerName', me.name); playerNameInput.value = me.name; } renderLobby(lobby); });
     socket.on('lobbyUpdate', (players) => { console.log('Received lobbyUpdate from server.'); if (isGameOver) return; renderLobby(players); });
     socket.on('updateGameState', (gameState) => { if (gameState.roundOver) { displayGame(gameState); } else { joinScreen.style.display = 'none'; lobbyScreen.style.display = 'none'; endOfRoundDiv.style.display = 'none'; gameBoard.style.display = 'flex'; displayGame(gameState); } });
     socket.on('announceRoundWinner', ({ winnerNames }) => { let message = `${winnerNames} wins the round!`; if (winnerNames.includes(' and ')) { message = `${winnerNames} win the round!`; } showUnoAnnouncement(message); });
@@ -254,17 +146,35 @@ window.addEventListener('DOMContentLoaded', () => {
         renderPlayers(gameState);
         renderPiles(gameState); // Creates piles and arrow
 
-        // *** Update Direction Arrow Class (No changes needed here) ***
+        // *** NEW: Update Direction Arrow Class AND Color ***
         const currentDirectionArrow = document.getElementById('direction-arrow');
         if (currentDirectionArrow) {
+            // Rotation
             if (gameState.playDirection === -1) {
                 currentDirectionArrow.classList.add('reversed');
             } else {
                 currentDirectionArrow.classList.remove('reversed');
             }
+
+            // Color
+            const arrowSvgPath = currentDirectionArrow.querySelector('svg path');
+            if (arrowSvgPath) {
+                 const activeColor = gameState.activeColor || 'Black'; // Default to Black if no color set
+                 const colorMap = {
+                    "Red": "#ff5555",
+                    "Green": "#55aa55",
+                    "Blue": "#5555ff",
+                    "Yellow": "#ffaa00",
+                    "Black": "#FFFFFF" // Use white if color is Black/not chosen
+                 };
+                 arrowSvgPath.style.fill = colorMap[activeColor] || '#FFFFFF'; // Set fill color
+            }
+
         } else {
              console.error("Direction arrow element not found after renderPiles");
         }
+        // *** End NEW ***
+
 
         const myPlayer = gameState.players.find(p => p.playerId === myPersistentPlayerId);
         if (!myPlayer) { showToast("You have been removed from the game."); sessionStorage.clear(); setTimeout(() => location.reload(), 1500); return; }
@@ -311,10 +221,10 @@ window.addEventListener('DOMContentLoaded', () => {
         // *** NEW: Create and add the SVG arrow element ***
         const arrowElement = document.createElement('div');
         arrowElement.id = 'direction-arrow';
-        // Simple SVG for a thick arrow pointing down
+        // SVG for a thick arrow pointing down - REMOVED default fill
         arrowElement.innerHTML = `
             <svg viewBox="0 0 100 220" preserveAspectRatio="xMidYMid meet" style="width: 100%; height: 100%; filter: drop-shadow(1px 1px 2px black);">
-                <path d="M50 210 L80 170 L65 170 L65 10 L35 10 L35 170 L20 170 Z" fill="white" />
+                <path d="M50 210 L80 170 L65 170 L65 10 L35 10 L35 170 L20 170 Z" />
             </svg>
         `;
         pilesContainer.appendChild(arrowElement); // Add arrow BETWEEN piles
@@ -377,53 +287,26 @@ window.addEventListener('DOMContentLoaded', () => {
         const isHost = myPlayer.isHost;
 
         gameState.players.forEach((player, playerIndex) => {
-            const playerArea = document.createElement('div');
-            playerArea.className = 'player-area';
-            playerArea.dataset.playerId = player.playerId;
+            const playerArea = document.createElement('div'); playerArea.className = 'player-area'; playerArea.dataset.playerId = player.playerId;
             if (player.status === 'Disconnected') { playerArea.classList.add('disconnected'); } else if (player.status === 'Removed') { playerArea.classList.add('disconnected', 'removed'); }
-            const currentPlayer = gameState.players[gameState.currentPlayerIndex];
-            const isCurrentPlayer = currentPlayer && playerIndex === gameState.currentPlayerIndex;
-            const isDealerChoosing = player.playerId === gameState.needsDealChoice;
-            if ((isCurrentPlayer && player.status === 'Active' && !gameState.isPaused && !gameState.roundOver) || isDealerChoosing) { playerArea.classList.add('active-player'); }
-            playerArea.classList.remove('uno-unsafe', 'uno-declared', 'has-uno');
-            if (player.unoState === 'unsafe') { playerArea.classList.add('uno-unsafe'); } else if (player.unoState === 'declared' && player.playerId === myPersistentPlayerId) { playerArea.classList.add('uno-declared'); }
-            if (player.hand.length === 1 && !gameState.roundOver) { playerArea.classList.add('has-uno'); }
-            const playerInfo = document.createElement('div'); playerInfo.className = 'player-info';
-            const nameSpan = document.createElement('span'); const hostIndicator = player.isHost ? '👑 ' : ''; nameSpan.innerHTML = `${hostIndicator}${player.name} (${player.hand.length} cards) <span class="player-score">Score: ${player.score}</span>`; playerInfo.appendChild(nameSpan);
-            if (isHost && player.playerId !== myPersistentPlayerId && player.status === 'Active' && !gameState.roundOver) { const afkBtn = document.createElement('button'); afkBtn.className = 'mark-afk-btn'; afkBtn.textContent = 'Mark AFK'; afkBtn.dataset.playerId = player.playerId; playerInfo.appendChild(afkBtn); }
-            playerArea.appendChild(playerInfo);
+            const currentPlayer = gameState.players[gameState.currentPlayerIndex]; const isCurrentPlayer = currentPlayer && playerIndex === gameState.currentPlayerIndex; const isDealerChoosing = player.playerId === gameState.needsDealChoice; if ((isCurrentPlayer && player.status === 'Active' && !gameState.isPaused && !gameState.roundOver) || isDealerChoosing) { playerArea.classList.add('active-player'); }
+            playerArea.classList.remove('uno-unsafe', 'uno-declared', 'has-uno'); if (player.unoState === 'unsafe') { playerArea.classList.add('uno-unsafe'); } else if (player.unoState === 'declared' && player.playerId === myPersistentPlayerId) { playerArea.classList.add('uno-declared'); } if (player.hand.length === 1 && !gameState.roundOver) { playerArea.classList.add('has-uno'); }
+            const playerInfo = document.createElement('div'); playerInfo.className = 'player-info'; const nameSpan = document.createElement('span'); const hostIndicator = player.isHost ? '👑 ' : ''; nameSpan.innerHTML = `${hostIndicator}${player.name} (${player.hand.length} cards) <span class="player-score">Score: ${player.score}</span>`; playerInfo.appendChild(nameSpan); if (isHost && player.playerId !== myPersistentPlayerId && player.status === 'Active' && !gameState.roundOver) { const afkBtn = document.createElement('button'); afkBtn.className = 'mark-afk-btn'; afkBtn.textContent = 'Mark AFK'; afkBtn.dataset.playerId = player.playerId; playerInfo.appendChild(afkBtn); } playerArea.appendChild(playerInfo);
             const cardContainer = document.createElement('div'); cardContainer.className = 'card-container';
             if (player.playerId === myPersistentPlayerId) {
                 const currentHand = player.hand;
-                currentHand.forEach((card, indexInHand) => {
-                    const originalCardIndex = indexInHand; const cardEl = createCardElement(card, originalCardIndex);
-                    const isMyTurn = isCurrentPlayer; if (isMyTurn && !gameState.isPaused && !gameState.roundOver && player.status === 'Active') { cardEl.classList.add('clickable'); }
-                    cardEl.addEventListener('click', () => { if (isMyTurn && !gameState.isPaused && !gameState.roundOver && player.status === 'Active') { if (isClientMoveValid(card, gameState)) { socket.emit('playCard', { cardIndex: originalCardIndex }); } else { triggerInvalidMoveFeedback(cardEl); } } });
-                    cardEl.draggable = isMyTurn && !gameState.isPaused && !gameState.roundOver; cardContainer.appendChild(cardEl);
-                });
+                currentHand.forEach((card, indexInHand) => { const originalCardIndex = indexInHand; const cardEl = createCardElement(card, originalCardIndex); const isMyTurn = isCurrentPlayer; if (isMyTurn && !gameState.isPaused && !gameState.roundOver && player.status === 'Active') { cardEl.classList.add('clickable'); } cardEl.addEventListener('click', () => { if (isMyTurn && !gameState.isPaused && !gameState.roundOver && player.status === 'Active') { if (isClientMoveValid(card, gameState)) { socket.emit('playCard', { cardIndex: originalCardIndex }); } else { triggerInvalidMoveFeedback(cardEl); } } }); cardEl.draggable = isMyTurn && !gameState.isPaused && !gameState.roundOver; cardContainer.appendChild(cardEl); });
                 cardContainer.ondragstart = e => { if (!e.target.classList.contains('card') || window.gameState?.isPaused || window.gameState?.roundOver) { e.preventDefault(); return; } draggedCardElement = e.target; draggedCardIndex = parseInt(e.target.dataset.cardIndex); setTimeout(() => e.target.classList.add('dragging'), 0); };
                 cardContainer.ondragend = e => { if (draggedCardElement) { draggedCardElement.classList.remove('dragging'); draggedCardElement.style.opacity = '1'; const myCurrentPlayerState = window.gameState?.players.find(p => p.playerId === myPersistentPlayerId); if (myCurrentPlayerState) { const newElements = [...cardContainer.querySelectorAll('.card')]; const validElements = newElements.filter(el => el !== draggedCardElement || !el.classList.contains('dragging')); const newIndices = validElements.map(el => parseInt(el.dataset.cardIndex)); const serverHand = myCurrentPlayerState.hand; if (newIndices.length === serverHand.length && newIndices.every(idx => idx >= 0 && idx < serverHand.length)) { const reorderedHand = newIndices.map(originalIndex => serverHand[originalIndex]).filter(Boolean); if (reorderedHand.length === serverHand.length) { socket.emit('rearrangeHand', { newHand: reorderedHand }); myPlayer.hand = reorderedHand; } } else { console.warn("Index mismatch during drag reorder, not sending update."); } } draggedCardElement = null; draggedCardIndex = -1; } };
                 cardContainer.ondragover = e => { e.preventDefault(); if (!draggedCardElement || window.gameState?.isPaused || window.gameState?.roundOver) return; const afterElement = getDragAfterElement(cardContainer, e.clientX); if (afterElement == null) { cardContainer.appendChild(draggedCardElement); } else { cardContainer.insertBefore(draggedCardElement, afterElement); } };
             } else { if (gameState.roundOver && player.status === 'Active') { player.hand.forEach((card, cardIndex) => { const cardEl = createCardElement(card, cardIndex); cardContainer.appendChild(cardEl); }); } else { if (player.hand.length === 1) { const cardEl = document.createElement('div'); cardEl.className = 'card uno-warning'; const unoSpan = document.createElement('span'); unoSpan.textContent = 'UNO'; cardEl.appendChild(unoSpan); cardContainer.appendChild(cardEl); } else { for (let j = 0; j < player.hand.length; j++) { const cardEl = document.createElement('div'); cardEl.className = 'card card-back'; cardContainer.appendChild(cardEl); } } } }
-            playerArea.appendChild(cardContainer);
-            leftColumn.appendChild(playerArea);
+            playerArea.appendChild(cardContainer); leftColumn.appendChild(playerArea);
         });
     }
 
     function getDragAfterElement(container, x) { const draggableElements = [...container.querySelectorAll('.card:not(.dragging)')]; return draggableElements.reduce((closest, child) => { const box = child.getBoundingClientRect(); const offset = x - box.left - box.width / 2; if (offset < 0 && offset > closest.offset) { return { offset: offset, element: child }; } else { return closest; } }, { offset: Number.NEGATIVE_INFINITY }).element; }
 
     // --- Make modals draggable ---
-    makeDraggable(document.getElementById('color-picker-modal'));
-    makeDraggable(document.getElementById('drawn-wild-modal'));
-    makeDraggable(document.getElementById('pick-until-modal'));
-    makeDraggable(document.getElementById('swap-modal'));
-    makeDraggable(document.getElementById('deal-choice-modal'));
-    makeDraggable(document.getElementById('confirm-end-game-modal'));
-    makeDraggable(document.getElementById('end-of-round-div'));
-    makeDraggable(document.getElementById('final-score-modal'));
-    makeDraggable(document.getElementById('afk-notification-modal'));
-    makeDraggable(document.getElementById('discard-pile-modal'));
-    makeDraggable(document.getElementById('confirm-afk-modal')); 
-    makeDraggable(document.getElementById('discard-wilds-modal'));
+    makeDraggable(document.getElementById('color-picker-modal')); makeDraggable(document.getElementById('drawn-wild-modal')); makeDraggable(document.getElementById('pick-until-modal')); makeDraggable(document.getElementById('swap-modal')); makeDraggable(document.getElementById('deal-choice-modal')); makeDraggable(document.getElementById('confirm-end-game-modal')); makeDraggable(document.getElementById('end-of-round-div')); makeDraggable(document.getElementById('final-score-modal')); makeDraggable(document.getElementById('afk-notification-modal')); makeDraggable(document.getElementById('discard-pile-modal')); makeDraggable(document.getElementById('confirm-afk-modal')); makeDraggable(document.getElementById('discard-wilds-modal'));
 
 });

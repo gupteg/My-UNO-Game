@@ -778,21 +778,25 @@ body {
     text-align: left;
 }
 
-/* *** MODIFIED: Direction Arrow Styles *** */
+/* *** MODIFIED: Direction Arrow Styles using SVG *** */
 #direction-arrow {
-    width: 50px; /* Give it a width */
+    width: 50px; /* Width of the arrow */
     height: 220px; /* Match card height */
     transition: transform 0.5s ease; /* Smooth rotation */
     transform-origin: center center; /* Rotate around the center */
-    /* Remove font-size, color, text-shadow as SVG handles appearance */
     animation: pulse 2s infinite ease-in-out; /* Add pulsating animation */
 }
 
 #direction-arrow svg {
-    /* Ensure SVG fills the container */
     display: block; /* Remove extra space below */
     width: 100%;
     height: 100%;
+}
+
+/* *** NEW: Default fill color for the arrow path *** */
+#direction-arrow svg path {
+    fill: white; /* Default color */
+    transition: fill 0.3s ease; /* Smooth color change */
 }
 
 #direction-arrow.reversed {
@@ -806,8 +810,8 @@ body {
     transform: scale(1);
   }
   50% {
-    opacity: 0.8;
-    transform: scale(1.03); /* Subtle scale */
+    opacity: 0.75; /* Dim slightly */
+    transform: scale(1.05); /* Subtle scale */
   }
 }
 
@@ -921,6 +925,7 @@ body {
          white-space: normal; /* Allow wrapping */
     }
 
+    /* *** MODIFIED: Adjust arrow size/height for mobile *** */
     #direction-arrow {
         height: 150px; /* Match mobile card height */
         width: 35px; /* Adjust width proportionally */
@@ -928,17 +933,7 @@ body {
 }
 
 /* *** Styles for Discard Wilds Modal *** */
-#discard-wilds-results {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-    max-height: 50vh;
-    overflow-y: auto;
-    padding: 10px;
-    background-color: rgba(0,0,0,0.2);
-    border-radius: 5px;
-    text-align: left;
-}
+#discard-wilds-results { display: flex; flex-direction: column; gap: 15px; max-height: 50vh; overflow-y: auto; padding: 10px; background-color: rgba(0,0,0,0.2); border-radius: 5px; text-align: left; }
 .discard-result-player { border-bottom: 1px solid #555; padding-bottom: 10px; }
 .discard-result-player:last-child { border-bottom: none; }
 .discard-result-player-name { font-size: 1.1em; font-weight: bold; margin: 0 0 10px 0; }
