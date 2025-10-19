@@ -8,7 +8,6 @@ window.addEventListener('DOMContentLoaded', () => {
     let playerIdToMarkAFK = null;
 
     // --- SCREEN & ELEMENT REFERENCES ---
-    // ... (References unchanged) ...
     const joinScreen = document.getElementById('join-screen');
     const lobbyScreen = document.getElementById('lobby-screen');
     const gameBoard = document.getElementById('game-board');
@@ -108,37 +107,33 @@ window.addEventListener('DOMContentLoaded', () => {
     socket.on('roundOver', ({ winnerName, scores, finalGameState }) => {
         window.gameState = finalGameState;
         setTimeout(() => {
-            // *** FIX: Ensure buttons are hidden by default before showing correct one ***
             hostRoundEndControls.style.display = 'none';
             nextRoundOkBtn.style.display = 'none';
 
-            displayGame(finalGameState); // Render final state (which shows the modal based on phase)
+            displayGame(finalGameState); // Render final state (which SHOULD show the modal based on phase)
 
             document.getElementById('winner-message').textContent = `${winnerName} win(s) the round!`;
             const scoresDisplay = document.getElementById('scores-display'); scoresDisplay.innerHTML = '<h3>Round Scores</h3>'; const scoreTable = document.createElement('table'); scoreTable.className = 'score-table'; let tableHTML = '<thead><tr><th>Player</th><th>Hand Score</th><th>Total Score</th></tr></thead><tbody>'; finalGameState.players.sort((a,b) => a.score - b.score).forEach(p => { const roundScoreForPlayer = p.scoresByRound[p.scoresByRound.length - 1]; const isWinner = winnerName.includes(p.name); tableHTML += `<tr class="${isWinner ? 'winner-row' : ''}"><td>${p.name}</td><td>${roundScoreForPlayer}</td><td>${p.score}</td></tr>`; }); tableHTML += '</tbody>'; scoreTable.innerHTML = tableHTML; scoresDisplay.appendChild(scoreTable);
 
             const myPlayer = finalGameState.players.find(p => p.playerId === myPersistentPlayerId);
-            // Add console logs for debugging
-            console.log("RoundOver: myPlayer found?", !!myPlayer);
+            console.log("RoundOver: myPlayer found?", !!myPlayer); // Keep debug log
             if (myPlayer) {
-                console.log("RoundOver: Am I host?", myPlayer.isHost);
+                console.log("RoundOver: Am I host?", myPlayer.isHost); // Keep debug log
                 if (myPlayer.isHost) {
-                    hostRoundEndControls.style.display = 'flex'; // Show host buttons
+                    hostRoundEndControls.style.display = 'flex';
                     nextRoundBtn.disabled = false;
                     nextRoundBtn.textContent = 'Start Next Round';
                 } else {
-                    nextRoundOkBtn.style.display = 'block'; // Show player OK button
+                    nextRoundOkBtn.style.display = 'block';
                 }
             } else {
-                console.error("RoundOver: Could not find myPlayer!");
+                console.error("RoundOver: Could not find myPlayer!"); // Keep debug log
             }
-            // displayGame already shows the modal based on phase, no need to show again
-            // endOfRoundDiv.style.display = 'flex';
         }, 1500);
      });
 
     socket.on('finalGameOver', (finalGameState) => { /* ... (unchanged) ... */ isGameOver = true; window.gameState = finalGameState; gameBoard.style.display = 'none'; endOfRoundDiv.style.display = 'none'; renderFinalScores(finalGameState); finalScoreModal.style.display = 'flex'; });
-    socket.on('drawnWildCard', ({ cardIndex, drawnCard }) => { /* ... (FIX applied - unchanged from previous) ... */ drawnWildModal.dataset.cardIndex = cardIndex; drawnWildModal.style.display = 'flex'; });
+    socket.on('drawnWildCard', ({ cardIndex, drawnCard }) => { /* ... (unchanged) ... */ drawnWildModal.dataset.cardIndex = cardIndex; drawnWildModal.style.display = 'flex'; });
     socket.on('announce', (message) => { showToast(message); });
     socket.on('youWereMarkedAFK', () => { afkNotificationModal.style.display = 'flex'; });
     socket.on('unoCalled', ({ playerName }) => { showUnoAnnouncement(`${playerName} says UNO!`); });
@@ -164,7 +159,71 @@ window.addEventListener('DOMContentLoaded', () => {
     function makeDraggable(element) { /* ... (unchanged) ... */ let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0; const header = element.querySelector('.modal-content h3, .modal-content h2, .modal-content p'); function dragMouseDown(e) { e.preventDefault(); pos3 = e.clientX; pos4 = e.clientY; document.onmouseup = closeDragElement; document.onmousemove = elementDrag; } function touchDown(e) { pos3 = e.touches[0].clientX; pos4 = e.touches[0].clientY; document.ontouchend = closeDragElement; document.ontouchmove = elementTouchDrag; } function elementDrag(e) { e.preventDefault(); pos1 = pos3 - e.clientX; pos2 = pos4 - e.clientY; pos3 = e.clientX; pos4 = e.clientY; let newTop = element.offsetTop - pos2; let newLeft = element.offsetLeft - pos1; element.style.top = newTop + "px"; element.style.left = newLeft + "px"; } function elementTouchDrag(e) { e.preventDefault(); pos1 = pos3 - e.touches[0].clientX; pos2 = pos4 - e.touches[0].clientY; pos3 = e.touches[0].clientX; pos4 = e.touches[0].clientY; let newTop = element.offsetTop - pos2; let newLeft = element.offsetLeft - pos1; element.style.top = newTop + "px"; element.style.left = newLeft + "px"; } function closeDragElement() { document.onmouseup = null; document.onmousemove = null; document.ontouchend = null; document.ontouchmove = null; } if (header) { header.style.cursor = 'move'; header.onmousedown = dragMouseDown; header.ontouchstart = touchDown; } else { const content = element.querySelector('.modal-content'); if (content) { content.style.cursor = 'move'; content.onmousedown = dragMouseDown; content.ontouchstart = touchDown; } } }
 
     // --- MAIN DISPLAY FUNCTION (REFACTORED) ---
-    function displayGame(gameState) { /* ... (Mostly unchanged, phase logic handles modals/buttons) ... */ window.gameState = gameState; if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; } colorPickerModal.style.display = 'none'; pickUntilModal.style.display = 'none'; dealChoiceModal.style.display = 'none'; endOfRoundDiv.style.display = 'none'; finalScoreModal.style.display = 'none'; swapModal.style.display = 'none'; drawnWildModal.style.display = 'none'; renderPlayers(gameState); renderPiles(gameState); updateDirectionArrow(gameState); const myPlayer = gameState.players.find(p => p.playerId === myPersistentPlayerId); if (!myPlayer) { showToast("Error: Could not find your player data."); return; } const currentPlayer = gameState.players[gameState.currentPlayerIndex]; const playerChoosingAction = gameState.players.find(p => p.playerId === gameState.playerChoosingActionId); const isMyTurn = myPlayer && currentPlayer?.playerId === myPlayer.playerId; const amIChoosingAction = myPlayer && playerChoosingAction?.playerId === myPlayer.playerId; const isPaused = gameState.isPaused; const isHost = myPlayer.isHost; if (actionBar) { actionBar.textContent = getActionBarText(gameState, currentPlayer, playerChoosingAction); } switch (gameState.phase) { case 'ChoosingColor': if (amIChoosingAction && !isPaused) colorPickerModal.style.display = 'flex'; break; case 'ChoosingPickUntilAction': if (amIChoosingAction && !isPaused) pickUntilModal.style.display = 'flex'; break; case 'ChoosingSwapHands': if (amIChoosingAction && !isPaused) { const swapOptions = document.getElementById('swap-player-options'); swapOptions.innerHTML = ''; gameState.players.forEach(player => { if (player.playerId !== myPersistentPlayerId && player.status === 'Active') { const button = document.createElement('button'); button.textContent = player.name; button.className = 'player-swap-btn'; button.dataset.playerId = player.playerId; swapOptions.appendChild(button); } }); swapModal.style.display = 'flex'; } break; case 'Dealing': if (amIChoosingAction && !isPaused) dealChoiceModal.style.display = 'flex'; break; case 'RoundOver': if (endOfRoundDiv.style.display !== 'flex') { endOfRoundDiv.style.display = 'none'; } break; } endGameBtn.style.display = (isHost && gameState.phase !== 'RoundOver' && gameState.phase !== 'GameOver') ? 'block' : 'none'; if (unoBtn) { const colorMap = { "Red": "#ff5555", "Green": "#55aa55", "Blue": "#5555ff", "Yellow": "#ffaa00" }; unoBtn.style.backgroundColor = colorMap[gameState.activeColor] || '#333'; const canDeclareUno = isMyTurn && gameState.phase === 'Playing' && myPlayer.hand.length === 2 && !isPaused; unoBtn.disabled = !canDeclareUno; unoBtn.classList.toggle('uno-ready', canDeclareUno); } if (drawCardBtn) { let drawBtnText = 'DRAW CARD'; let drawBtnDisabled = true; if (!isPaused && gameState.phase === 'Playing') { if (isMyTurn) { const pickUntilInfo = gameState.pickUntilState; const isPickingUntil = pickUntilInfo?.active && pickUntilInfo.targetPlayerIndex === gameState.currentPlayerIndex; if (isPickingUntil) { drawBtnText = `${currentPlayer.name} PICKS FOR ${pickUntilInfo.targetColor.toUpperCase()}`; drawBtnDisabled = false; } else if (gameState.drawPenalty > 0) { drawBtnText = `${currentPlayer.name} DRAWS ${gameState.drawPenalty}`; drawBtnDisabled = false; } else { drawBtnText = 'DRAW CARD'; drawBtnDisabled = false; } } else { drawBtnDisabled = true; const pickUntilInfo = gameState.pickUntilState; const isPickingUntil = pickUntilInfo?.active && pickUntilInfo.targetPlayerIndex === gameState.currentPlayerIndex; if(isPickingUntil) { drawBtnText = `${currentPlayer?.name} PICKS FOR ${pickUntilInfo.targetColor.toUpperCase()}`; } else if (gameState.drawPenalty > 0 && gameState.currentPlayerIndex === gameState.players.findIndex(p => p.playerId === currentPlayer?.playerId)) { drawBtnText = `${currentPlayer?.name} DRAWS ${gameState.drawPenalty}`; } else { drawBtnText = 'DRAW CARD'; } } } else { drawBtnDisabled = true; drawBtnText = 'DRAW CARD'; } drawCardBtn.textContent = drawBtnText; drawCardBtn.disabled = drawBtnDisabled; } }
+    function displayGame(gameState) {
+        window.gameState = gameState;
+
+        if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+
+        // Hide all modals initially
+        colorPickerModal.style.display = 'none';
+        pickUntilModal.style.display = 'none';
+        dealChoiceModal.style.display = 'none';
+        endOfRoundDiv.style.display = 'none'; // Will be shown by RoundOver case if needed
+        finalScoreModal.style.display = 'none'; // Will be shown by GameOver case if needed
+        swapModal.style.display = 'none';
+        drawnWildModal.style.display = 'none';
+
+        renderPlayers(gameState);
+        renderPiles(gameState);
+        updateDirectionArrow(gameState);
+
+        const myPlayer = gameState.players.find(p => p.playerId === myPersistentPlayerId);
+        if (!myPlayer) { showToast("Error: Could not find your player data."); return; }
+
+        const currentPlayer = gameState.players[gameState.currentPlayerIndex];
+        const playerChoosingAction = gameState.players.find(p => p.playerId === gameState.playerChoosingActionId);
+        const isMyTurn = myPlayer && currentPlayer?.playerId === myPlayer.playerId;
+        const amIChoosingAction = myPlayer && playerChoosingAction?.playerId === myPlayer.playerId;
+        const isPaused = gameState.isPaused;
+        const isHost = myPlayer.isHost;
+
+        if (actionBar) { actionBar.textContent = getActionBarText(gameState, currentPlayer, playerChoosingAction); }
+
+        // --- Show Correct Modal based on Phase ---
+        switch (gameState.phase) {
+            case 'ChoosingColor':
+                if (amIChoosingAction && !isPaused) colorPickerModal.style.display = 'flex';
+                break;
+            case 'ChoosingPickUntilAction':
+                if (amIChoosingAction && !isPaused) pickUntilModal.style.display = 'flex';
+                break;
+            case 'ChoosingSwapHands':
+                if (amIChoosingAction && !isPaused) {
+                    const swapOptions = document.getElementById('swap-player-options'); swapOptions.innerHTML = '';
+                    gameState.players.forEach(player => { if (player.playerId !== myPersistentPlayerId && player.status === 'Active') { const button = document.createElement('button'); button.textContent = player.name; button.className = 'player-swap-btn'; button.dataset.playerId = player.playerId; swapOptions.appendChild(button); } });
+                    swapModal.style.display = 'flex';
+                }
+                break;
+            case 'Dealing':
+                if (amIChoosingAction && !isPaused) dealChoiceModal.style.display = 'flex';
+                break;
+            case 'RoundOver':
+                // *** FIX: Explicitly show the modal ***
+                endOfRoundDiv.style.display = 'flex';
+                break;
+            case 'GameOver':
+                // The finalGameOver event handler shows this modal, but displayGame might run after
+                // Ensure it's shown if the phase is correct
+                finalScoreModal.style.display = 'flex';
+                break;
+        }
+
+        // --- Button States ---
+        endGameBtn.style.display = (isHost && gameState.phase !== 'RoundOver' && gameState.phase !== 'GameOver') ? 'block' : 'none';
+        if (unoBtn) { /* ... (UNO button logic unchanged) ... */ const colorMap = { "Red": "#ff5555", "Green": "#55aa55", "Blue": "#5555ff", "Yellow": "#ffaa00" }; unoBtn.style.backgroundColor = colorMap[gameState.activeColor] || '#333'; const canDeclareUno = isMyTurn && gameState.phase === 'Playing' && myPlayer.hand.length === 2 && !isPaused; unoBtn.disabled = !canDeclareUno; unoBtn.classList.toggle('uno-ready', canDeclareUno); }
+        if (drawCardBtn) { /* ... (Draw button logic unchanged) ... */ let drawBtnText = 'DRAW CARD'; let drawBtnDisabled = true; if (!isPaused && gameState.phase === 'Playing') { if (isMyTurn) { const pickUntilInfo = gameState.pickUntilState; const isPickingUntil = pickUntilInfo?.active && pickUntilInfo.targetPlayerIndex === gameState.currentPlayerIndex; if (isPickingUntil) { drawBtnText = `${currentPlayer.name} PICKS FOR ${pickUntilInfo.targetColor.toUpperCase()}`; drawBtnDisabled = false; } else if (gameState.drawPenalty > 0) { drawBtnText = `${currentPlayer.name} DRAWS ${gameState.drawPenalty}`; drawBtnDisabled = false; } else { drawBtnText = 'DRAW CARD'; drawBtnDisabled = false; } } else { drawBtnDisabled = true; const pickUntilInfo = gameState.pickUntilState; const isPickingUntil = pickUntilInfo?.active && pickUntilInfo.targetPlayerIndex === gameState.currentPlayerIndex; if(isPickingUntil) { drawBtnText = `${currentPlayer?.name} PICKS FOR ${pickUntilInfo.targetColor.toUpperCase()}`; } else if (gameState.drawPenalty > 0 && gameState.currentPlayerIndex === gameState.players.findIndex(p => p.playerId === currentPlayer?.playerId)) { drawBtnText = `${currentPlayer?.name} DRAWS ${gameState.drawPenalty}`; } else { drawBtnText = 'DRAW CARD'; } } } else { drawBtnDisabled = true; drawBtnText = 'DRAW CARD'; } drawCardBtn.textContent = drawBtnText; drawCardBtn.disabled = drawBtnDisabled; }
+    }
+
     // --- Helper for Action Bar Text ---
     function getActionBarText(gameState, currentPlayer, playerChoosingAction) { /* ... (unchanged) ... */ if (gameState.isPaused && gameState.pauseInfo?.pauseEndTime) { const { pauseEndTime, pausedForPlayerNames } = gameState.pauseInfo; const names = pausedForPlayerNames.join(', '); const updateTimer = () => { const remaining = Math.max(0, Math.floor((pauseEndTime - Date.now()) / 1000)); actionBar.textContent = `Waiting ${remaining}s for ${names} to rejoin...`; if (!countdownInterval && remaining > 0) { countdownInterval = setInterval(updateTimer, 1000); } else if (remaining <= 0 && countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; } }; updateTimer(); return actionBar.textContent; } if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; } switch(gameState.phase) { case 'Lobby': return "Waiting for players..."; case 'Dealing': return playerChoosingAction ? `Waiting for ${playerChoosingAction.name} (Dealer) to deal...` : 'Waiting for dealer...'; case 'Playing': if (gameState.pickUntilState?.active && gameState.pickUntilState.targetPlayerIndex === gameState.currentPlayerIndex) { return `${currentPlayer.name} must pick until they find a ${gameState.pickUntilState.targetColor}!`; } else if (gameState.drawPenalty > 0 && gameState.currentPlayerIndex === gameState.players.findIndex(p => p.playerId === currentPlayer?.playerId)) { return `${currentPlayer.name} must draw ${gameState.drawPenalty}!`; } return currentPlayer ? `Waiting for ${currentPlayer.name} to play...` : 'Waiting for player...'; case 'ChoosingColor': return playerChoosingAction ? `${playerChoosingAction.name} is choosing a color...` : 'Choosing a color...'; case 'ChoosingPickUntilAction': return playerChoosingAction ? `${playerChoosingAction.name} is choosing Wild Pick Until action...` : 'Choosing action...'; case 'ChoosingSwapHands': return playerChoosingAction ? `${playerChoosingAction.name} is choosing who to swap with...` : 'Choosing swap target...'; case 'RoundOver': const host = gameState.players.find(p => p.isHost); const hostIsReady = gameState.readyForNextRound.includes(host?.playerId); const connectedPlayers = gameState.players.filter(p => p.status === 'Active'); const allReady = gameState.readyForNextRound.length === connectedPlayers.length; if (hostIsReady && !allReady) { const waitingOnPlayers = connectedPlayers.filter(p => !gameState.readyForNextRound.includes(p.playerId)); const waitingOnNames = waitingOnPlayers.map(p => p.name).join(', '); return `Waiting for ${waitingOnNames} to click OK...`; } else if (!hostIsReady && allReady) { return `Waiting for ${host?.name} (Host) to start next round...`; } else { return `Round Over! Waiting for players...`; } case 'GameOver': return "Game Over!"; default: return "Loading..."; } }
     // --- Helper to Update Direction Arrow ---
