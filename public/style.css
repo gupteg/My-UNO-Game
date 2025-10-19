@@ -274,6 +274,8 @@ body {
 
 #piles-area {
   color: white;
+  /* *** NEW: Ensure piles-container can position arrow *** */
+  position: relative; 
 }
 
 .pile-wrapper {
@@ -301,8 +303,10 @@ body {
 .piles-container {
   display: flex;
   justify-content: center;
-  gap: 20px;
+  align-items: center; /* *** NEW: Vertically align items *** */
+  gap: 30px; /* *** MODIFIED: Increased gap *** */
   text-align: center;
+  position: relative; /* Needed for absolute positioning of arrow later if flex order fails */
 }
 
 #discard-pile-dropzone {
@@ -686,7 +690,6 @@ body {
     font-weight: bold;
 }
 
-/* *** MODIFIED: Toast Notification Styles *** */
 #toast-notification {
   position: fixed; /* Use fixed for viewport positioning */
   bottom: 150px; /* Raised position for desktop */
@@ -776,6 +779,19 @@ body {
     text-align: left;
 }
 
+/* *** NEW: Direction Arrow Styles *** */
+#direction-arrow {
+    font-size: 3em; /* Large arrow */
+    color: white;
+    text-shadow: 1px 1px 3px black;
+    transition: transform 0.5s ease; /* Smooth rotation */
+    transform-origin: center center; /* Rotate around the center */
+    order: 2; /* Place it visually between piles (using flex order) */
+}
+
+#direction-arrow.reversed {
+    transform: rotate(180deg);
+}
 
 /* Responsive Layout for Mobile Devices */
 @media (max-width: 768px) {
@@ -892,6 +908,10 @@ body {
          white-space: normal; /* Allow wrapping */
     }
 
+    /* *** NEW: Adjust arrow size for mobile *** */
+    #direction-arrow {
+        font-size: 2.5em; /* Slightly smaller on mobile */
+    }
 }
 
 /* *** NEW: Styles for Discard Wilds Modal *** */

@@ -67,6 +67,9 @@ window.addEventListener('DOMContentLoaded', () => {
     const discardWildsResults = document.getElementById('discard-wilds-results');
     const discardWildsOkBtn = document.getElementById('discard-wilds-ok-btn');
 
+    // *** NEW: Direction Arrow Reference ***
+    const directionArrow = document.getElementById('direction-arrow');
+
 
     joinScreen.style.display = 'block';
     lobbyScreen.style.display = 'none';
@@ -881,7 +884,21 @@ window.addEventListener('DOMContentLoaded', () => {
         }
 
         renderPlayers(gameState);
-        renderPiles(gameState);
+        renderPiles(gameState); // This creates the piles container, but not the arrow yet
+
+        // *** NEW: Update Direction Arrow ***
+        if (directionArrow) {
+            if (gameState.playDirection === -1) {
+                directionArrow.classList.add('reversed');
+            } else {
+                directionArrow.classList.remove('reversed');
+            }
+        } else {
+            // This might happen if renderPiles hasn't run yet or failed
+            console.error("Direction arrow element not found after renderPiles");
+        }
+        // *** End NEW ***
+
 
         const myPlayer = gameState.players.find(p => p.playerId === myPersistentPlayerId);
         if (!myPlayer) {
@@ -1009,11 +1026,26 @@ window.addEventListener('DOMContentLoaded', () => {
 
     function renderPiles(gameState) {
         const pilesArea = document.getElementById('piles-area');
-        pilesArea.innerHTML = '';
+        // Clear previous content EXCEPT the arrow
+        const arrow = document.getElementById('direction-arrow');
+        pilesArea.innerHTML = ''; // Clear everything
+        if (arrow) {
+           pilesArea.appendChild(arrow); // Re-add the arrow first
+        } else {
+            // Create arrow if it doesn't exist (e.g., first render)
+            const newArrow = document.createElement('div');
+            newArrow.id = 'direction-arrow';
+            newArrow.textContent = '⬇️';
+            pilesArea.appendChild(newArrow);
+        }
+
         const pilesContainer = document.createElement('div');
         pilesContainer.className = 'piles-container';
+
+        // Draw Pile
         const drawPileWrapper = document.createElement('div');
         drawPileWrapper.className = 'pile-wrapper';
+        drawPileWrapper.style.order = '1'; // Ensure it's on the left
         const drawPileTitle = document.createElement('h4');
         drawPileTitle.textContent = 'Draw Pile';
         const drawCount = document.createElement('div');
@@ -1025,8 +1057,12 @@ window.addEventListener('DOMContentLoaded', () => {
         drawPileWrapper.appendChild(drawPileTitle);
         drawPileWrapper.appendChild(drawCount);
         drawPileWrapper.appendChild(cardBackElement);
+        pilesContainer.appendChild(drawPileWrapper); // Add draw pile to container
+
+        // Discard Pile
         const discardPileWrapper = document.createElement('div');
         discardPileWrapper.className = 'pile-wrapper';
+        discardPileWrapper.style.order = '3'; // Ensure it's on the right
         const discardPileTitle = document.createElement('h4');
         discardPileTitle.textContent = 'Discard Pile';
         const discardCount = document.createElement('div');
@@ -1034,24 +1070,22 @@ window.addEventListener('DOMContentLoaded', () => {
         discardCount.textContent = `(${gameState.discardPile.length} Cards)`;
         const discardPileDiv = document.createElement('div');
         discardPileDiv.id = 'discard-pile-dropzone';
-
         const topDiscard = gameState.discardPile[0];
         if (topDiscard && topDiscard.card) { // Safety check
             const topCardElement = createCardElement(topDiscard.card, -1);
             discardPileDiv.appendChild(topCardElement);
         }
-
         discardPileWrapper.appendChild(discardPileTitle);
         discardPileWrapper.appendChild(discardCount);
         discardPileWrapper.appendChild(discardPileDiv);
-        pilesContainer.appendChild(drawPileWrapper);
-        pilesContainer.appendChild(discardPileWrapper);
+        pilesContainer.appendChild(discardPileWrapper); // Add discard pile to container
+
+        // Add the container (with piles) to the main area
         pilesArea.appendChild(pilesContainer);
 
+        // --- Drag & Drop logic for discard pile (unchanged) ---
         const dropZone = document.getElementById('discard-pile-dropzone');
-        // Ensure event listeners are added only once or cleared if re-rendered
-        // (This basic implementation might add listeners multiple times if renderPiles is called often without clearing)
-        dropZone.ondragover = (e) => { // Use on-event handlers to avoid duplicates simply
+        dropZone.ondragover = (e) => {
             e.preventDefault();
             dropZone.classList.add('over');
         };
@@ -1063,9 +1097,8 @@ window.addEventListener('DOMContentLoaded', () => {
             dropZone.classList.remove('over');
             if (draggedCardIndex !== -1) {
                 const myPlayer = gameState.players.find(p => p.playerId === myPersistentPlayerId);
-                const currentPlayer = gameState.players[gameState.currentPlayerIndex]; // Added check
+                const currentPlayer = gameState.players[gameState.currentPlayerIndex];
                 const isMyTurn = myPlayer && currentPlayer && currentPlayer.playerId === myPlayer.playerId;
-
 
                 if(isMyTurn && !gameState.isPaused && !gameState.roundOver) {
                     const playedCard = myPlayer.hand[draggedCardIndex];
@@ -1077,13 +1110,13 @@ window.addEventListener('DOMContentLoaded', () => {
                         }
                     }
                 }
-                 // Reset drag state regardless of validity
                 if (draggedCardElement) draggedCardElement.style.opacity = '1';
                 draggedCardElement = null;
                 draggedCardIndex = -1;
             }
         };
     }
+
 
     function renderPlayers(gameState) {
         const leftColumn = document.getElementById('left-column');
@@ -1294,6 +1327,6 @@ window.addEventListener('DOMContentLoaded', () => {
     makeDraggable(document.getElementById('afk-notification-modal'));
     makeDraggable(document.getElementById('discard-pile-modal'));
     makeDraggable(document.getElementById('confirm-afk-modal')); 
-    makeDraggable(document.getElementById('discard-wilds-modal')); // *** NEW ***
+    makeDraggable(document.getElementById('discard-wilds-modal'));
 
 });
