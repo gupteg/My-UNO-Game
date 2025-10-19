@@ -274,8 +274,7 @@ body {
 
 #piles-area {
   color: white;
-  /* *** NEW: Ensure piles-container can position arrow *** */
-  position: relative; 
+  position: relative;
 }
 
 .pile-wrapper {
@@ -303,10 +302,10 @@ body {
 .piles-container {
   display: flex;
   justify-content: center;
-  align-items: center; /* *** NEW: Vertically align items *** */
-  gap: 30px; /* *** MODIFIED: Increased gap *** */
+  align-items: center; /* Vertically align items */
+  gap: 30px; /* Increased gap */
   text-align: center;
-  position: relative; /* Needed for absolute positioning of arrow later if flex order fails */
+  position: relative;
 }
 
 #discard-pile-dropzone {
@@ -779,19 +778,20 @@ body {
     text-align: left;
 }
 
-/* *** NEW: Direction Arrow Styles *** */
+/* *** MODIFIED: Direction Arrow Styles *** */
 #direction-arrow {
-    font-size: 3em; /* Large arrow */
+    font-size: 4.5em; /* Increased size */
     color: white;
     text-shadow: 1px 1px 3px black;
     transition: transform 0.5s ease; /* Smooth rotation */
     transform-origin: center center; /* Rotate around the center */
-    order: 2; /* Place it visually between piles (using flex order) */
+    /* Order removed, placed by DOM structure now */
 }
 
 #direction-arrow.reversed {
     transform: rotate(180deg);
 }
+
 
 /* Responsive Layout for Mobile Devices */
 @media (max-width: 768px) {
@@ -908,9 +908,8 @@ body {
          white-space: normal; /* Allow wrapping */
     }
 
-    /* *** NEW: Adjust arrow size for mobile *** */
     #direction-arrow {
-        font-size: 2.5em; /* Slightly smaller on mobile */
+        font-size: 3.5em; /* Larger, but less than desktop */
     }
 }
 

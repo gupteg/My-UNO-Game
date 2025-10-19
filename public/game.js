@@ -67,8 +67,8 @@ window.addEventListener('DOMContentLoaded', () => {
     const discardWildsResults = document.getElementById('discard-wilds-results');
     const discardWildsOkBtn = document.getElementById('discard-wilds-ok-btn');
 
-    // *** NEW: Direction Arrow Reference ***
-    const directionArrow = document.getElementById('direction-arrow');
+    // *** REMOVED Direction Arrow Reference (created dynamically) ***
+    // const directionArrow = document.getElementById('direction-arrow');
 
 
     joinScreen.style.display = 'block';
@@ -884,18 +884,19 @@ window.addEventListener('DOMContentLoaded', () => {
         }
 
         renderPlayers(gameState);
-        renderPiles(gameState); // This creates the piles container, but not the arrow yet
+        renderPiles(gameState); // This now creates the arrow element inside .piles-container
 
-        // *** NEW: Update Direction Arrow ***
-        if (directionArrow) {
+        // *** NEW: Update Direction Arrow Class ***
+        // Need to get the arrow element *after* renderPiles creates it
+        const currentDirectionArrow = document.getElementById('direction-arrow');
+        if (currentDirectionArrow) {
             if (gameState.playDirection === -1) {
-                directionArrow.classList.add('reversed');
+                currentDirectionArrow.classList.add('reversed');
             } else {
-                directionArrow.classList.remove('reversed');
+                currentDirectionArrow.classList.remove('reversed');
             }
         } else {
-            // This might happen if renderPiles hasn't run yet or failed
-            console.error("Direction arrow element not found after renderPiles");
+             console.error("Direction arrow element not found after renderPiles");
         }
         // *** End NEW ***
 
@@ -1026,18 +1027,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     function renderPiles(gameState) {
         const pilesArea = document.getElementById('piles-area');
-        // Clear previous content EXCEPT the arrow
-        const arrow = document.getElementById('direction-arrow');
-        pilesArea.innerHTML = ''; // Clear everything
-        if (arrow) {
-           pilesArea.appendChild(arrow); // Re-add the arrow first
-        } else {
-            // Create arrow if it doesn't exist (e.g., first render)
-            const newArrow = document.createElement('div');
-            newArrow.id = 'direction-arrow';
-            newArrow.textContent = '⬇️';
-            pilesArea.appendChild(newArrow);
-        }
+        pilesArea.innerHTML = ''; // Clear the entire area first
 
         const pilesContainer = document.createElement('div');
         pilesContainer.className = 'piles-container';
@@ -1045,7 +1035,7 @@ window.addEventListener('DOMContentLoaded', () => {
         // Draw Pile
         const drawPileWrapper = document.createElement('div');
         drawPileWrapper.className = 'pile-wrapper';
-        drawPileWrapper.style.order = '1'; // Ensure it's on the left
+        // drawPileWrapper.style.order = '1'; // Order no longer needed
         const drawPileTitle = document.createElement('h4');
         drawPileTitle.textContent = 'Draw Pile';
         const drawCount = document.createElement('div');
@@ -1057,12 +1047,18 @@ window.addEventListener('DOMContentLoaded', () => {
         drawPileWrapper.appendChild(drawPileTitle);
         drawPileWrapper.appendChild(drawCount);
         drawPileWrapper.appendChild(cardBackElement);
-        pilesContainer.appendChild(drawPileWrapper); // Add draw pile to container
+        pilesContainer.appendChild(drawPileWrapper); // Add draw pile to container FIRST
+
+        // *** NEW: Create and add the arrow element ***
+        const arrowElement = document.createElement('div');
+        arrowElement.id = 'direction-arrow';
+        arrowElement.textContent = '⬇️'; // Default direction
+        pilesContainer.appendChild(arrowElement); // Add arrow BETWEEN piles
 
         // Discard Pile
         const discardPileWrapper = document.createElement('div');
         discardPileWrapper.className = 'pile-wrapper';
-        discardPileWrapper.style.order = '3'; // Ensure it's on the right
+        // discardPileWrapper.style.order = '3'; // Order no longer needed
         const discardPileTitle = document.createElement('h4');
         discardPileTitle.textContent = 'Discard Pile';
         const discardCount = document.createElement('div');
@@ -1078,43 +1074,45 @@ window.addEventListener('DOMContentLoaded', () => {
         discardPileWrapper.appendChild(discardPileTitle);
         discardPileWrapper.appendChild(discardCount);
         discardPileWrapper.appendChild(discardPileDiv);
-        pilesContainer.appendChild(discardPileWrapper); // Add discard pile to container
+        pilesContainer.appendChild(discardPileWrapper); // Add discard pile LAST
 
-        // Add the container (with piles) to the main area
+        // Add the container (with piles AND arrow) to the main area
         pilesArea.appendChild(pilesContainer);
 
         // --- Drag & Drop logic for discard pile (unchanged) ---
         const dropZone = document.getElementById('discard-pile-dropzone');
-        dropZone.ondragover = (e) => {
-            e.preventDefault();
-            dropZone.classList.add('over');
-        };
-        dropZone.ondragleave = () => {
-            dropZone.classList.remove('over');
-        };
-        dropZone.ondrop = (e) => {
-            e.preventDefault();
-            dropZone.classList.remove('over');
-            if (draggedCardIndex !== -1) {
-                const myPlayer = gameState.players.find(p => p.playerId === myPersistentPlayerId);
-                const currentPlayer = gameState.players[gameState.currentPlayerIndex];
-                const isMyTurn = myPlayer && currentPlayer && currentPlayer.playerId === myPlayer.playerId;
-
-                if(isMyTurn && !gameState.isPaused && !gameState.roundOver) {
-                    const playedCard = myPlayer.hand[draggedCardIndex];
-                    if (isClientMoveValid(playedCard, gameState)) {
-                        socket.emit('playCard', { cardIndex: draggedCardIndex });
-                    } else {
-                        if (draggedCardElement) {
-                            triggerInvalidMoveFeedback(draggedCardElement);
+        if (dropZone) { // Add safety check as it's created dynamically
+            dropZone.ondragover = (e) => {
+                e.preventDefault();
+                dropZone.classList.add('over');
+            };
+            dropZone.ondragleave = () => {
+                dropZone.classList.remove('over');
+            };
+            dropZone.ondrop = (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('over');
+                if (draggedCardIndex !== -1) {
+                    const myPlayer = window.gameState?.players.find(p => p.playerId === myPersistentPlayerId); // Use optional chaining
+                    const currentPlayer = window.gameState?.players[window.gameState.currentPlayerIndex]; // Use optional chaining
+                    const isMyTurn = myPlayer && currentPlayer && currentPlayer.playerId === myPlayer.playerId;
+    
+                    if(window.gameState && isMyTurn && !window.gameState.isPaused && !window.gameState.roundOver) { // Check gameState exists
+                        const playedCard = myPlayer.hand[draggedCardIndex];
+                        if (isClientMoveValid(playedCard, window.gameState)) { // Pass gameState
+                            socket.emit('playCard', { cardIndex: draggedCardIndex });
+                        } else {
+                            if (draggedCardElement) {
+                                triggerInvalidMoveFeedback(draggedCardElement);
+                            }
                         }
                     }
+                    if (draggedCardElement) draggedCardElement.style.opacity = '1';
+                    draggedCardElement = null;
+                    draggedCardIndex = -1;
                 }
-                if (draggedCardElement) draggedCardElement.style.opacity = '1';
-                draggedCardElement = null;
-                draggedCardIndex = -1;
-            }
-        };
+            };
+        }
     }
 
 
@@ -1208,52 +1206,35 @@ window.addEventListener('DOMContentLoaded', () => {
 
                  // --- Drag and Drop for Player's Hand ---
                 cardContainer.ondragstart = e => { // Use on-event handlers
-                    if (!e.target.classList.contains('card') || gameState.isPaused || gameState.roundOver) {
+                    if (!e.target.classList.contains('card') || window.gameState?.isPaused || window.gameState?.roundOver) { // Added gameState checks
                         e.preventDefault();
                         return;
                     }
                     draggedCardElement = e.target;
                     draggedCardIndex = parseInt(e.target.dataset.cardIndex);
-                    // Add dragging class for visual feedback (optional)
                      setTimeout(() => e.target.classList.add('dragging'), 0);
-                    // Use dataTransfer for better drag compatibility (optional but good practice)
-                    // e.dataTransfer.setData('text/plain', draggedCardIndex);
-                    // e.dataTransfer.effectAllowed = 'move';
                 };
 
                 cardContainer.ondragend = e => { // Use on-event handlers
                     if (draggedCardElement) {
                         draggedCardElement.classList.remove('dragging');
-                        // Update opacity immediately
                         draggedCardElement.style.opacity = '1';
 
-                        // Check if the drop occurred *outside* a valid dropzone (like discard pile)
-                        // If dropped outside, or drag cancelled, potentially re-render or just reset state
-                         // Re-ordering logic:
                         const myCurrentPlayerState = window.gameState?.players.find(p => p.playerId === myPersistentPlayerId);
                         if (myCurrentPlayerState) {
                              const newElements = [...cardContainer.querySelectorAll('.card')];
-                             // Filter out the ghost element if it's still there briefly
                              const validElements = newElements.filter(el => el !== draggedCardElement || !el.classList.contains('dragging'));
                              const newIndices = validElements.map(el => parseInt(el.dataset.cardIndex));
-
-                             // Get the server hand corresponding to the *current* gameState
                              const serverHand = myCurrentPlayerState.hand;
 
-                             // Check if indices are valid and match hand length before reordering
                             if (newIndices.length === serverHand.length && newIndices.every(idx => idx >= 0 && idx < serverHand.length)) {
-                                const reorderedHand = newIndices.map(originalIndex => serverHand[originalIndex]).filter(Boolean); // Filter out potential undefineds
-                                if (reorderedHand.length === serverHand.length) { // Final check
+                                const reorderedHand = newIndices.map(originalIndex => serverHand[originalIndex]).filter(Boolean); 
+                                if (reorderedHand.length === serverHand.length) { 
                                     socket.emit('rearrangeHand', { newHand: reorderedHand });
-                                     // Optimistic update (optional)
-                                     myPlayer.hand = reorderedHand;
-                                     // Re-render just my hand immediately might be smoother
-                                     // renderPlayers(window.gameState); // Be careful of infinite loops
+                                     myPlayer.hand = reorderedHand; // Optimistic update
                                 }
                             } else {
                                 console.warn("Index mismatch during drag reorder, not sending update.");
-                                // Force re-render from server state if needed
-                                // displayGame(window.gameState);
                             }
                         }
                         draggedCardElement = null;
@@ -1263,7 +1244,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
                 cardContainer.ondragover = e => { // Use on-event handlers
                     e.preventDefault();
-                    if (!draggedCardElement || gameState.isPaused || gameState.roundOver) return; // Only allow drop if dragging and game active
+                    if (!draggedCardElement || window.gameState?.isPaused || window.gameState?.roundOver) return; // Added gameState checks
                     const afterElement = getDragAfterElement(cardContainer, e.clientX);
                     if (afterElement == null) {
                         cardContainer.appendChild(draggedCardElement);
