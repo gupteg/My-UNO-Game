@@ -65,8 +65,6 @@ body {
   overflow-x: hidden; /* Clip internal overflow */
 }
 
-/* ... (Rest of styles largely unchanged, only adding modal styles if needed) ... */
-
 .player-area { padding: 10px; border: 3px solid transparent; border-radius: 10px; background-color: rgba(0,0,0,0.1); transition: all 0.3s ease; }
 .player-area.active-player { border-color: #ffc107; box-shadow: 0 0 15px #ffc107; }
 .player-info { color: white; margin-bottom: 8px; font-size: 1.2em; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; justify-content: space-between; align-items: center; }
@@ -133,9 +131,9 @@ body {
 #invalid-move-callout.show { display: block; animation: fade-in-out 1.5s ease-in-out; }
 @keyframes fade-in-out { 0% { opacity: 0; transform: translateY(10px); } 20% { opacity: 1; transform: translateY(0); } 80% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(10px); } }
 .flying-card { position: absolute; z-index: 300; transition: transform 0.8s ease-in-out, top 0.8s ease-in-out, left 0.8s ease-in-out; }
-#game-log-container { width: 100%; color: white; text-align: center; padding: 0 10px; flex-grow: 1; display: flex; flex-direction: column; } /* Allow log to grow */
+#game-log-container { width: 100%; color: white; text-align: center; padding: 0 10px; flex-grow: 1; display: flex; flex-direction: column; }
 #game-log-container h4 { margin: 0 0 5px 0; font-size: 1.1em; }
-#game-log-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; overflow-y: auto; flex-grow: 1; } /* Make list scrollable */
+#game-log-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; overflow-y: auto; flex-grow: 1; }
 #game-log-list li { background-color: rgba(0,0,0,0.3); padding: 3px 6px; border-radius: 4px; margin-bottom: 4px; font-size: 0.9em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; animation: slide-in 0.4s ease-out; }
 #game-log-list li:first-child { font-weight: bold; color: white; }
 @keyframes slide-in { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
@@ -145,7 +143,30 @@ body {
 .modal-buttons-container button:hover, #next-round-ok-btn:hover:not(:disabled), .lobby-actions button:hover:not(:disabled) { transform: scale(1.05); box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
 #next-round-btn, #confirm-end-yes-btn, #final-score-ok-btn, #next-round-ok-btn, #im-back-btn, #discard-pile-ok-btn, #confirm-afk-yes-btn, #discard-wilds-ok-btn { background-color: #55aa55; border-color: #448844; color: white; }
 #end-game-round-btn, #confirm-end-no-btn, #confirm-afk-no-btn, #confirm-reset-no-btn { background-color: #ff5555; border-color: #cc4444; color: white; }
-#toast-notification { position: fixed; bottom: 150px; left: 50%; transform: translateX(-50%); padding: 15px 30px; background-color: rgba(0,0,0,0.9); color: #ffc107; font-weight: bold; border-radius: 25px; border: 2px solid #ffc107; z-index: 500; opacity: 0; transition: all 0.5s ease-in-out; pointer-events: none; font-size: 3.6em; white-space: nowrap; }
+
+/* --- *** MODIFIED: Toast Notification Styles *** --- */
+#toast-notification {
+  position: fixed;
+  bottom: 150px; /* Raised position for desktop */
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 15px 30px;
+  background-color: rgba(0,0,0,0.9);
+  color: #ffc107;
+  font-weight: bold;
+  border-radius: 25px;
+  border: 2px solid #ffc107;
+  z-index: 500;
+  opacity: 0;
+  transition: all 0.5s ease-in-out;
+  pointer-events: none;
+  font-size: 2.7em;   /* Reduced from 3.6em */
+  white-space: normal; /* Allow wrapping */
+  max-width: 90%;    /* Prevent excessive width */
+  text-align: center; /* Center wrapped text */
+}
+/* --- *** END MODIFIED *** --- */
+
 #toast-notification.show { opacity: 1; transform: translate(-50%, 10px); }
 .player-area.disconnected { opacity: 0.5; background-color: rgba(100, 100, 100, 0.2); border-color: #666 !important; box-shadow: none !important; }
 .player-area.disconnected:not(.removed) .player-info > span:first-child::after { content: '(Disconnected)'; font-style: italic; font-weight: normal; color: #ffdddd; margin-left: 10px; }
