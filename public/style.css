@@ -200,4 +200,10 @@ body {
 @keyframes firework-explode { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(25); opacity: 0; } }
 .firework-particle { position: fixed; width: 6px; height: 6px; border-radius: 50%; z-index: 9998; pointer-events: none; animation: firework-particle-fade 1s ease-out forwards; }
 @keyframes firework-particle-fade { 0% { opacity: 1; transform: translate(0, 0); } 100% { opacity: 0; transform: translate(var(--vx), calc(var(--vy) + 30px)); } }
+
+/* --- *** NEW: Style for wait message *** --- */
+#lobby-wait-message {
+    color: #ccc; /* Lighter text color */
+    font-size: 0.9em;
+}
 /* --- END --- */

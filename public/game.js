@@ -6,7 +6,6 @@ window.addEventListener('DOMContentLoaded', () => {
     let isGameOver = false;
     let countdownInterval = null;
     let playerIdToMarkAFK = null;
-    // window.expectingLobbyUpdate = false; // Flag no longer needed here
 
     // --- SCREEN & ELEMENT REFERENCES ---
     const joinScreen = document.getElementById('join-screen');
@@ -67,6 +66,7 @@ window.addEventListener('DOMContentLoaded', () => {
     const confirmHardResetModal = document.getElementById('confirm-hard-reset-modal');
     const confirmResetYesBtn = document.getElementById('confirm-reset-yes-btn');
     const confirmResetNoBtn = document.getElementById('confirm-reset-no-btn');
+    const lobbyWaitMessage = document.getElementById('lobby-wait-message'); // Get wait message element
 
 
     joinScreen.style.display = 'block';
@@ -114,15 +114,18 @@ window.addEventListener('DOMContentLoaded', () => {
 
     confirmEndYesBtn.addEventListener('click', () => {
         confirmEndGameModal.style.display = 'none';
-        // window.expectingLobbyUpdate = true; // No longer needed
         socket.emit('endGame');
     });
 
-    // *** MODIFIED: Simplified OK button logic ***
+    // *** MODIFIED: Show wait message instead of hiding modal ***
     finalScoreOkBtn.addEventListener('click', () => {
-        finalScoreModal.style.display = 'none';
-        // Always just hide the modal. The server's lobbyUpdate event will handle the transition.
-        isGameOver = false; // Allow lobby rendering
+        finalScoreOkBtn.disabled = true; // Disable button
+        if (lobbyWaitMessage) {
+            lobbyWaitMessage.textContent = "Please wait while you are taken to the Lobby...";
+            lobbyWaitMessage.style.display = 'block'; // Show message
+        }
+        isGameOver = false; // Allow lobby rendering later
+        // Modal is NOT hidden here anymore
     });
 
     unoBtn.addEventListener('click', () => { socket.emit('callUno'); unoBtn.classList.add('pressed'); setTimeout(() => unoBtn.classList.remove('pressed'), 300); });
@@ -143,12 +146,41 @@ window.addEventListener('DOMContentLoaded', () => {
 
     socket.on('connect', () => { /* ... (unchanged) ... */ console.log('Socket connected with ID:', socket.id); if (myPersistentPlayerId) { console.log('Attempting to rejoin with existing ID:', myPersistentPlayerId); const savedName = sessionStorage.getItem('unoPlayerName') || playerNameInput.value.trim() || "Player"; playerNameInput.value = savedName; socket.emit('joinGame', { playerName: savedName, playerId: myPersistentPlayerId }); } else { const savedName = sessionStorage.getItem('unoPlayerName'); if (savedName) playerNameInput.value = savedName; } });
     socket.on('joinSuccess', ({ playerId, lobby }) => { /* ... (unchanged) ... */ console.log('Successfully joined/registered with ID:', playerId); myPersistentPlayerId = playerId; sessionStorage.setItem('unoPlayerId', playerId); const me = lobby.find(p => p.playerId === playerId); if (me) { sessionStorage.setItem('unoPlayerName', me.name); playerNameInput.value = me.name; } renderLobby(lobby); });
-    socket.on('lobbyUpdate', (currentLobbyPlayers) => { /* ... (unchanged, handles showing lobby) ... */ console.log('Received lobbyUpdate from server.'); /* if (isGameOver) return; */ /* Check removed to allow lobby update after game over */ if (!window.gameState || window.gameState.phase === 'Lobby' || window.gameState.phase === 'GameOver') { renderLobby(currentLobbyPlayers); joinScreen.style.display = 'none'; gameBoard.style.display = 'none'; lobbyScreen.style.display = 'block'; endOfRoundDiv.style.display = 'none'; finalScoreModal.style.display = 'none'; window.gameState = null; } });
+
+    // *** MODIFIED: Hide wait message on lobby update ***
+    socket.on('lobbyUpdate', (currentLobbyPlayers) => {
+        console.log('Received lobbyUpdate from server.');
+        // Hide final score modal and reset its state completely when lobby update arrives
+        finalScoreModal.style.display = 'none';
+        finalScoreOkBtn.disabled = false;
+        if (lobbyWaitMessage) {
+            lobbyWaitMessage.style.display = 'none';
+        }
+        isGameOver = false; // Ensure lobby can render
+
+        if (!window.gameState || window.gameState.phase === 'Lobby' || window.gameState.phase === 'GameOver') {
+            renderLobby(currentLobbyPlayers);
+            joinScreen.style.display = 'none';
+            gameBoard.style.display = 'none';
+            lobbyScreen.style.display = 'block';
+            endOfRoundDiv.style.display = 'none';
+            // finalScoreModal.style.display = 'none'; // Already hidden above
+            window.gameState = null;
+        }
+    });
+
     socket.on('forceDisconnect', () => { /* ... (unchanged) ... */ console.log("Received force disconnect from server."); showToast("You have been disconnected by the host."); sessionStorage.removeItem('unoPlayerId'); sessionStorage.removeItem('unoPlayerName'); myPersistentPlayerId = null; setTimeout(() => { location.reload(); }, 1500); });
     socket.on('updateGameState', (gameState) => { /* ... (unchanged) ... */ window.gameState = gameState; if (gameState.phase === 'Lobby') { console.warn("Received gameState update with phase 'Lobby', rendering lobby."); renderLobby(gameState.players); joinScreen.style.display = 'none'; gameBoard.style.display = 'none'; lobbyScreen.style.display = 'block'; } else if (gameState.phase === 'GameOver') { /* finalGameOver handles this */ } else { joinScreen.style.display = 'none'; lobbyScreen.style.display = 'none'; gameBoard.style.display = 'flex'; displayGame(gameState); } });
     socket.on('announceRoundWinner', ({ winnerNames }) => { /* ... (unchanged) ... */ let message = `${winnerNames} wins the round!`; if (winnerNames.includes(' and ')) { message = `${winnerNames} win the round!`; } showUnoAnnouncement(message); triggerConfetti(false); });
     socket.on('roundOver', ({ winnerName, scores, finalGameState }) => { /* ... (unchanged) ... */ window.gameState = finalGameState; setTimeout(() => { displayGame(finalGameState); document.getElementById('winner-message').textContent = `${winnerName} win(s) the round!`; const scoresDisplay = document.getElementById('scores-display'); scoresDisplay.innerHTML = '<h3>Round Scores</h3>'; const scoreTable = document.createElement('table'); scoreTable.className = 'score-table'; let tableHTML = '<thead><tr><th>Player</th><th>Hand Score</th><th>Total Score</th></tr></thead><tbody>'; finalGameState.players.sort((a,b) => a.score - b.score).forEach(p => { const roundScoreForPlayer = p.scoresByRound[p.scoresByRound.length - 1]; const isWinner = winnerName.includes(p.name); tableHTML += `<tr class="${isWinner ? 'winner-row' : ''}"><td>${p.name}</td><td>${roundScoreForPlayer}</td><td>${p.score}</td></tr>`; }); tableHTML += '</tbody>'; scoreTable.innerHTML = tableHTML; scoresDisplay.appendChild(scoreTable); }, 1500); });
-    socket.on('finalGameOver', (finalGameState) => { /* ... (unchanged) ... */ isGameOver = true; window.gameState = finalGameState; gameBoard.style.display = 'none'; endOfRoundDiv.style.display = 'none'; renderFinalScores(finalGameState); finalScoreModal.style.display = 'flex'; triggerConfetti(true); triggerFireworks(); });
+
+    // *** NEW: Announce final winner before showing scores ***
+    socket.on('announceFinalWinner', ({ winnerNames }) => {
+        const message = `${winnerNames} WIN(S) THE GAME!`;
+        showToast(message); // Show the toast first
+    });
+
+    socket.on('finalGameOver', (finalGameState) => { /* ... (unchanged, shows scores/fireworks after announce) ... */ isGameOver = true; window.gameState = finalGameState; gameBoard.style.display = 'none'; endOfRoundDiv.style.display = 'none'; renderFinalScores(finalGameState); finalScoreModal.style.display = 'flex'; triggerConfetti(true); triggerFireworks(); });
     socket.on('drawnWildCard', ({ cardIndex, drawnCard }) => { /* ... (unchanged) ... */ const drawnWildCardName = document.getElementById('drawn-wild-card-name'); if (drawnWildCardName) { const cardName = drawnCard.value.replace(/([A-Z])/g, ' $1').trim().toUpperCase(); drawnWildCardName.textContent = `YOU DREW A ${cardName}!`; } drawnWildModal.dataset.cardIndex = cardIndex; drawnWildModal.style.display = 'flex'; });
     socket.on('announce', (message) => { /* ... (unchanged) ... */ showToast(message); });
     socket.on('youWereMarkedAFK', () => { /* ... (unchanged) ... */ afkNotificationModal.style.display = 'flex'; });
@@ -160,8 +192,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
 
     // --- ALL DISPLAY AND HELPER FUNCTIONS ---
-
-    function renderLobby(currentLobbyPlayers) { /* ... (unchanged, handles ready status etc.) ... */ const me = currentLobbyPlayers.find(p => p.playerId === myPersistentPlayerId); if (!me && sessionStorage.getItem('unoPlayerId')) { showToast("You may have been kicked or the session ended."); sessionStorage.removeItem('unoPlayerId'); sessionStorage.removeItem('unoPlayerName'); myPersistentPlayerId = null; setTimeout(() => { location.reload(); }, 1500); return; } if (!me) { console.error("Could not find player data in lobby."); joinScreen.style.display = 'block'; lobbyScreen.style.display = 'none'; gameBoard.style.display = 'none'; return; } joinScreen.style.display = 'none'; lobbyScreen.style.display = 'block'; gameBoard.style.display = 'none'; endOfRoundDiv.style.display = 'none'; finalScoreModal.style.display = 'none'; if (gameLogList) gameLogList.innerHTML = ''; playerList.innerHTML = ''; let amIHost = me.isHost; currentLobbyPlayers.forEach(player => { if (!player.active) return; const playerItem = document.createElement('li'); const playerInfoDiv = document.createElement('div'); const statusDiv = document.createElement('div'); const nameSpan = document.createElement('span'); nameSpan.className = 'player-name'; let content = player.name; if (player.isHost) content += ' 👑 (Host)'; if (player.playerId === myPersistentPlayerId) content += ' (You)'; nameSpan.textContent = content; playerInfoDiv.appendChild(nameSpan); const readyStatusSpan = document.createElement('span'); readyStatusSpan.className = 'ready-status'; readyStatusSpan.innerHTML = player.isReady ? '✅ Ready' : '❌ Not Ready'; statusDiv.appendChild(readyStatusSpan); if (amIHost && player.playerId !== myPersistentPlayerId) { const kickBtn = document.createElement('button'); kickBtn.className = 'kick-btn'; kickBtn.textContent = 'Kick'; kickBtn.dataset.playerId = player.playerId; statusDiv.appendChild(kickBtn); } playerItem.appendChild(playerInfoDiv); playerItem.appendChild(statusDiv); playerList.appendChild(playerItem); }); if (amIHost) { playerLobbyActions.style.display = 'none'; hostLobbyActions.style.display = 'flex'; const activePlayers = currentLobbyPlayers.filter(p => p.active); const allReady = activePlayers.every(p => p.isReady); startGameBtn.disabled = !(activePlayers.length >= 2 && allReady); } else { playerLobbyActions.style.display = 'flex'; hostLobbyActions.style.display = 'none'; readyBtn.disabled = me.isReady; readyBtn.textContent = me.isReady ? 'Ready' : 'Set Ready'; } hostMessage.style.display = amIHost ? 'none' : 'block'; }
+    function renderLobby(currentLobbyPlayers) { /* ... (unchanged) ... */ const me = currentLobbyPlayers.find(p => p.playerId === myPersistentPlayerId); if (!me && sessionStorage.getItem('unoPlayerId')) { showToast("You may have been kicked or the session ended."); sessionStorage.removeItem('unoPlayerId'); sessionStorage.removeItem('unoPlayerName'); myPersistentPlayerId = null; setTimeout(() => { location.reload(); }, 1500); return; } if (!me) { console.error("Could not find player data in lobby."); joinScreen.style.display = 'block'; lobbyScreen.style.display = 'none'; gameBoard.style.display = 'none'; return; } joinScreen.style.display = 'none'; lobbyScreen.style.display = 'block'; gameBoard.style.display = 'none'; endOfRoundDiv.style.display = 'none'; finalScoreModal.style.display = 'none'; if (gameLogList) gameLogList.innerHTML = ''; playerList.innerHTML = ''; let amIHost = me.isHost; currentLobbyPlayers.forEach(player => { if (!player.active) return; const playerItem = document.createElement('li'); const playerInfoDiv = document.createElement('div'); const statusDiv = document.createElement('div'); const nameSpan = document.createElement('span'); nameSpan.className = 'player-name'; let content = player.name; if (player.isHost) content += ' 👑 (Host)'; if (player.playerId === myPersistentPlayerId) content += ' (You)'; nameSpan.textContent = content; playerInfoDiv.appendChild(nameSpan); const readyStatusSpan = document.createElement('span'); readyStatusSpan.className = 'ready-status'; readyStatusSpan.innerHTML = player.isReady ? '✅ Ready' : '❌ Not Ready'; statusDiv.appendChild(readyStatusSpan); if (amIHost && player.playerId !== myPersistentPlayerId) { const kickBtn = document.createElement('button'); kickBtn.className = 'kick-btn'; kickBtn.textContent = 'Kick'; kickBtn.dataset.playerId = player.playerId; statusDiv.appendChild(kickBtn); } playerItem.appendChild(playerInfoDiv); playerItem.appendChild(statusDiv); playerList.appendChild(playerItem); }); if (amIHost) { playerLobbyActions.style.display = 'none'; hostLobbyActions.style.display = 'flex'; const activePlayers = currentLobbyPlayers.filter(p => p.active); const allReady = activePlayers.every(p => p.isReady); startGameBtn.disabled = !(activePlayers.length >= 2 && allReady); } else { playerLobbyActions.style.display = 'flex'; hostLobbyActions.style.display = 'none'; readyBtn.disabled = me.isReady; readyBtn.textContent = me.isReady ? 'Ready' : 'Set Ready'; } hostMessage.style.display = amIHost ? 'none' : 'block'; }
     function showToast(message) { /* ... (unchanged) ... */ if (!toastNotification) return; toastNotification.textContent = message; toastNotification.classList.add('show'); setTimeout(() => { toastNotification.classList.remove('show'); }, 3000); }
     function showUnoAnnouncement(message) { /* ... (unchanged) ... */ unoAnnouncementText.textContent = message; if (message.length > 10) { unoAnnouncementText.style.fontSize = '8vw'; } else { unoAnnouncementText.style.fontSize = '15vw'; } unoAnnouncementOverlay.classList.add('show'); setTimeout(() => { unoAnnouncementOverlay.classList.remove('show'); }, 1900); }
     function isClientMoveValid(playedCard, gameState) { /* ... (unchanged) ... */ if (!gameState || !gameState.discardPile || gameState.discardPile.length === 0) return false; const topDiscard = gameState.discardPile[0]; if (!topDiscard || !topDiscard.card) return false; const topCard = topDiscard.card; const activeColor = gameState.activeColor; const drawPenalty = gameState.drawPenalty; if (drawPenalty > 0) { return playedCard.value === topCard.value; } if (playedCard.color === 'Black') return true; if (playedCard.color === activeColor || playedCard.value === topCard.value) return true; return false; }

@@ -17,8 +17,7 @@
     <div id="lobby-screen" style="display: none;">
         <h2>Game Lobby</h2>
         <h3>Players:</h3>
-        <ul id="player-list">
-            </ul>
+        <ul id="player-list"></ul>
 
         <div id="player-lobby-actions" class="lobby-actions" style="display: none;">
             <button id="ready-btn">Ready</button>
@@ -34,6 +33,8 @@
 
         <p id="host-message" style="display: none;">(Waiting for the host to start the game)</p>
     </div>
+
+
     <div id="game-board" style="display: none;">
         <div id="action-bar">Waiting for game to start...</div>
 
@@ -97,16 +98,17 @@
             </div>
         </div>
     </div>
+
     <div id="final-score-modal" class="modal" style="display: none;">
         <div class="modal-content wide">
             <h2 id="final-winner-message"></h2>
             <div id="final-score-table-container"></div>
+            <p id="lobby-wait-message" style="display: none; margin-top: 15px; font-style: italic;"></p>
             <div class="modal-buttons-container">
                 <button id="final-score-ok-btn">OK</button>
             </div>
         </div>
     </div>
-
     <div id="afk-notification-modal" class="modal" style="display: none;">
         <div class="modal-content">
             <h3>You were marked as AFK!</h3>
