@@ -147,7 +147,7 @@ body {
 /* --- *** MODIFIED: Toast Notification Styles *** --- */
 #toast-notification {
   position: fixed;
-  bottom: 150px; /* Raised position for desktop */
+  bottom: 150px;
   left: 50%;
   transform: translateX(-50%);
   padding: 15px 30px;
