@@ -76,7 +76,16 @@ window.addEventListener('DOMContentLoaded', () => {
     confirmAfkNoBtn.addEventListener('click', () => { confirmAfkModal.style.display = 'none'; playerIdToMarkAFK = null; });
     imBackBtn.addEventListener('click', () => { socket.emit('playerIsBack'); afkNotificationModal.style.display = 'none'; });
     startGameBtn.addEventListener('click', () => { socket.emit('startGame'); });
-    drawCardBtn.addEventListener('click', () => { socket.emit('drawCard'); });
+
+    // *** MODIFIED (A): Added "Must Play" check ***
+    drawCardBtn.addEventListener('click', () => { 
+        if (playerHasPlayableNonWildCard(window.gameState)) {
+            showToast('You have a playable card in your hand. You must play it.');
+            return;
+        }
+        socket.emit('drawCard'); 
+    });
+
     endGameBtn.addEventListener('click', () => { confirmEndGameModal.style.display = 'flex'; });
     endGameRoundBtn.addEventListener('click', () => { confirmEndGameModal.style.display = 'flex'; });
     confirmEndNoBtn.addEventListener('click', () => { confirmEndGameModal.style.display = 'none'; });
@@ -118,34 +127,24 @@ window.addEventListener('DOMContentLoaded', () => {
         triggerConfetti(false); // Trigger round winner confetti
     });
 
+    // *** MODIFIED (B): Removed conflicting button logic ***
     socket.on('roundOver', ({ winnerName, scores, finalGameState }) => {
         window.gameState = finalGameState;
         setTimeout(() => {
-            hostRoundEndControls.style.display = 'none';
-            nextRoundOkBtn.style.display = 'none';
+            // hostRoundEndControls.style.display = 'none'; // REMOVED
+            // nextRoundOkBtn.style.display = 'none'; // REMOVED
 
             displayGame(finalGameState); // Render final state (which SHOULD show the modal based on phase)
 
             document.getElementById('winner-message').textContent = `${winnerName} win(s) the round!`;
             const scoresDisplay = document.getElementById('scores-display'); scoresDisplay.innerHTML = '<h3>Round Scores</h3>'; const scoreTable = document.createElement('table'); scoreTable.className = 'score-table'; let tableHTML = '<thead><tr><th>Player</th><th>Hand Score</th><th>Total Score</th></tr></thead><tbody>'; finalGameState.players.sort((a,b) => a.score - b.score).forEach(p => { const roundScoreForPlayer = p.scoresByRound[p.scoresByRound.length - 1]; const isWinner = winnerName.includes(p.name); tableHTML += `<tr class="${isWinner ? 'winner-row' : ''}"><td>${p.name}</td><td>${roundScoreForPlayer}</td><td>${p.score}</td></tr>`; }); tableHTML += '</tbody>'; scoreTable.innerHTML = tableHTML; scoresDisplay.appendChild(scoreTable);
+            
+            // --- ALL THIS LOGIC WAS REMOVED ---
+            // It is now handled centrally by displayGame()
+            // const myPlayer = finalGameState.players.find(p => p.playerId === myPersistentPlayerId);
+            // ...
+            // --- END OF REMOVED BLOCK ---
 
-            const myPlayer = finalGameState.players.find(p => p.playerId === myPersistentPlayerId);
-            console.log("RoundOver: myPlayer found?", !!myPlayer); // Keep debug log
-            if (myPlayer) {
-                console.log("RoundOver: Am I host?", myPlayer.isHost); // Keep debug log
-                if (myPlayer.isHost) {
-                    hostRoundEndControls.style.display = 'flex';
-                    nextRoundBtn.disabled = false;
-                    nextRoundBtn.textContent = 'Start Next Round';
-                } else {
-                    nextRoundOkBtn.style.display = 'block';
-                    // *** MODIFIED (A): Reset non-host button state in case it's re-rendered ***
-                    nextRoundOkBtn.disabled = false;
-                    nextRoundOkBtn.textContent = 'OK';
-                }
-            } else {
-                console.error("RoundOver: Could not find myPlayer!"); // Keep debug log
-            }
         }, 1500);
      });
 
@@ -188,6 +187,37 @@ window.addEventListener('DOMContentLoaded', () => {
     function showToast(message) { /* ... (unchanged) ... */ if (!toastNotification) return; toastNotification.textContent = message; toastNotification.classList.add('show'); setTimeout(() => { toastNotification.classList.remove('show'); }, 3000); }
     function showUnoAnnouncement(message) { /* ... (unchanged) ... */ unoAnnouncementText.textContent = message; if (message.length > 10) { unoAnnouncementText.style.fontSize = '8vw'; } else { unoAnnouncementText.style.fontSize = '15vw'; } unoAnnouncementOverlay.classList.add('show'); setTimeout(() => { unoAnnouncementOverlay.classList.remove('show'); }, 1900); }
     function isClientMoveValid(playedCard, gameState) { /* ... (unchanged) ... */ if (!gameState || !gameState.discardPile || gameState.discardPile.length === 0) return false; const topDiscard = gameState.discardPile[0]; if (!topDiscard || !topDiscard.card) return false; const topCard = topDiscard.card; const activeColor = gameState.activeColor; const drawPenalty = gameState.drawPenalty; if (drawPenalty > 0) { return playedCard.value === topCard.value; } if (playedCard.color === 'Black') return true; if (playedCard.color === activeColor || playedCard.value === topCard.value) return true; return false; }
+    
+    // *** NEW (A): Helper for "Must Play" check ***
+    function playerHasPlayableNonWildCard(gameState) {
+        if (!gameState || !gameState.players || !gameState.discardPile || gameState.discardPile.length === 0) {
+            return false;
+        }
+        const myPlayer = gameState.players.find(p => p.playerId === myPersistentPlayerId);
+        if (!myPlayer) {
+            return false;
+        }
+
+        // Check if it's my turn and I'm in the 'Playing' phase, with no draw penalty.
+        const isMyTurn = gameState.players[gameState.currentPlayerIndex]?.playerId === myPersistentPlayerId;
+        const isPlaying = gameState.phase === 'Playing';
+        const noPenalty = gameState.drawPenalty === 0 && !gameState.pickUntilState?.active;
+
+        if (!isMyTurn || !isPlaying || !noPenalty) {
+            return false;
+        }
+
+        // Loop through hand and use isClientMoveValid (which is an identical check to the server's)
+        for (const card of myPlayer.hand) {
+            if (card.color !== 'Black') { // Skip wild cards
+                if (isClientMoveValid(card, gameState)) {
+                    return true; // Found a playable non-wild card
+                }
+            }
+        }
+        return false; // No playable non-wild cards found
+    }
+
     function triggerInvalidMoveFeedback(cardElement) { /* ... (unchanged) ... */ cardElement.classList.add('invalid-shake'); const cardRect = cardElement.getBoundingClientRect(); const boardRect = gameBoard.getBoundingClientRect(); invalidMoveCallout.style.top = `${cardRect.top - boardRect.top - 40}px`; invalidMoveCallout.style.left = `${cardRect.left - boardRect.left + (cardRect.width / 2) - (invalidMoveCallout.offsetWidth / 2)}px`; invalidMoveCallout.classList.add('show'); setTimeout(() => { cardElement.classList.remove('invalid-shake'); }, 500); setTimeout(() => { invalidMoveCallout.classList.remove('show'); }, 1500); }
     function animateCardPlay(playerId, card, cardIndex) { /* ... (unchanged) ... */ const discardPileEl = document.querySelector('#discard-pile-dropzone .card'); const playerAreaEl = document.querySelector(`[data-player-id="${playerId}"]`); if (!discardPileEl || !playerAreaEl) return; const startRect = playerAreaEl.getBoundingClientRect(); const endRect = discardPileEl.getBoundingClientRect(); const boardRect = gameBoard.getBoundingClientRect(); const clone = createCardElement(card, -1); clone.classList.add('flying-card'); clone.style.top = `${startRect.top - boardRect.top + (startRect.height / 2) - 60}px`; clone.style.left = `${startRect.left - boardRect.left + (startRect.width / 2) - 40}px`; clone.style.width = '80px'; clone.style.height = '120px'; if (playerId === myPersistentPlayerId && window.gameState) { const myPlayer = window.gameState.players.find(p => p.playerId === myPersistentPlayerId); if (myPlayer) { const cardToHide = playerAreaEl.querySelector(`.card[data-card-index="${cardIndex}"]`); if(cardToHide) cardToHide.style.visibility = 'hidden'; else { const cards = playerAreaEl.querySelectorAll('.card-container .card'); if (cards.length > 0) cards[cards.length - 1].style.visibility = 'hidden'; } } } gameBoard.appendChild(clone); requestAnimationFrame(() => { clone.style.top = `${endRect.top - boardRect.top}px`; clone.style.left = `${endRect.left - boardRect.left}px`; clone.style.transform = `rotate(360deg)`; clone.style.width = `${endRect.width}px`; clone.style.height = `${endRect.height}px`; }); setTimeout(() => { clone.remove(); }, 800); }
     function animateCardDraw(playerId, count) { /* ... (unchanged) ... */ const drawPileEl = document.querySelector('.piles-container .card-back'); const playerAreaEl = document.querySelector(`[data-player-id="${playerId}"] .card-container`); if (!drawPileEl || !playerAreaEl) return; const startRect = drawPileEl.getBoundingClientRect(); const endRect = playerAreaEl.getBoundingClientRect(); const boardRect = gameBoard.getBoundingClientRect(); const smallCardWidth = 80; const scaleFactor = smallCardWidth / startRect.width; for (let i = 0; i < count; i++) { const cardBack = document.createElement('div'); cardBack.className = 'card card-back flying-card'; cardBack.style.top = `${startRect.top - boardRect.top}px`; cardBack.style.left = `${startRect.left - boardRect.top}px`; cardBack.style.width = `${startRect.width}px`; cardBack.style.height = `${startRect.height}px`; cardBack.style.transform = 'scale(1.2)'; gameBoard.appendChild(cardBack); setTimeout(() => { requestAnimationFrame(() => { const top = `${endRect.top - boardRect.top + 10}px`; const left = `${endRect.left - boardRect.left + (i * (smallCardWidth / 4))}px`; cardBack.style.transform = `scale(${scaleFactor})`; cardBack.style.top = top; cardBack.style.left = left; cardBack.style.width = `${smallCardWidth}px`; cardBack.style.height = `${smallCardWidth * 1.5}px`; }); }, i * 100 + 50); setTimeout(() => { cardBack.remove(); }, 800 + (i * 100)); } }
@@ -285,7 +315,47 @@ window.addEventListener('DOMContentLoaded', () => {
         // --- Button States ---
         endGameBtn.style.display = (isHost && gameState.phase !== 'RoundOver' && gameState.phase !== 'GameOver') ? 'block' : 'none';
         if (unoBtn) { /* ... (UNO button logic unchanged) ... */ const colorMap = { "Red": "#ff5555", "Green": "#55aa55", "Blue": "#5555ff", "Yellow": "#ffaa00" }; unoBtn.style.backgroundColor = colorMap[gameState.activeColor] || '#333'; const canDeclareUno = isMyTurn && gameState.phase === 'Playing' && myPlayer.hand.length === 2 && !isPaused; unoBtn.disabled = !canDeclareUno; unoBtn.classList.toggle('uno-ready', canDeclareUno); }
-        if (drawCardBtn) { /* ... (Draw button logic unchanged) ... */ let drawBtnText = 'DRAW CARD'; let drawBtnDisabled = true; if (!isPaused && gameState.phase === 'Playing') { if (isMyTurn) { const pickUntilInfo = gameState.pickUntilState; const isPickingUntil = pickUntilInfo?.active && pickUntilInfo.targetPlayerIndex === gameState.currentPlayerIndex; if (isPickingUntil) { drawBtnText = `${currentPlayer.name} PICKS FOR ${pickUntilInfo.targetColor.toUpperCase()}`; drawBtnDisabled = false; } else if (gameState.drawPenalty > 0) { drawBtnText = `${currentPlayer.name} DRAWS ${gameState.drawPenalty}`; drawBtnDisabled = false; } else { drawBtnText = 'DRAW CARD'; drawBtnDisabled = false; } } else { drawBtnDisabled = true; const pickUntilInfo = gameState.pickUntilState; const isPickingUntil = pickUntilInfo?.active && pickUntilInfo.targetPlayerIndex === gameState.currentPlayerIndex; if(isPickingUntil) { drawBtnText = `${currentPlayer?.name} PICKS FOR ${pickUntilInfo.targetColor.toUpperCase()}`; } else if (gameState.drawPenalty > 0 && gameState.currentPlayerIndex === gameState.players.findIndex(p => p.playerId === currentPlayer?.playerId)) { drawBtnText = `${currentPlayer?.name} DRAWS ${gameState.drawPenalty}`; } else { drawBtnText = 'DRAW CARD'; } } } else { drawBtnDisabled = true; drawBtnText = 'DRAW CARD'; } drawCardBtn.textContent = drawBtnText; drawCardBtn.disabled = drawBtnDisabled; }
+        if (drawCardBtn) { 
+            let drawBtnText = 'DRAW CARD'; 
+            let drawBtnDisabled = true; 
+            if (!isPaused && gameState.phase === 'Playing') { 
+                if (isMyTurn) { 
+                    const pickUntilInfo = gameState.pickUntilState; 
+                    const isPickingUntil = pickUntilInfo?.active && pickUntilInfo.targetPlayerIndex === gameState.currentPlayerIndex; 
+                    if (isPickingUntil) { 
+                        drawBtnText = `${currentPlayer.name} PICKS FOR ${pickUntilInfo.targetColor.toUpperCase()}`; 
+                        drawBtnDisabled = false; 
+                    } else if (gameState.drawPenalty > 0) { 
+                        drawBtnText = `${currentPlayer.name} DRAWS ${gameState.drawPenalty}`; 
+                        drawBtnDisabled = false; 
+                    } else { 
+                        drawBtnText = 'DRAW CARD'; 
+                        drawBtnDisabled = false; 
+                        
+                        // *** NEW (A): Disable draw button if player must play ***
+                        if (playerHasPlayableNonWildCard(gameState)) {
+                            drawBtnDisabled = true; 
+                        }
+                    } 
+                } else { 
+                    drawBtnDisabled = true; 
+                    const pickUntilInfo = gameState.pickUntilState; 
+                    const isPickingUntil = pickUntilInfo?.active && pickUntilInfo.targetPlayerIndex === gameState.currentPlayerIndex; 
+                    if(isPickingUntil) { 
+                        drawBtnText = `${currentPlayer?.name} PICKS FOR ${pickUntilInfo.targetColor.toUpperCase()}`; 
+                    } else if (gameState.drawPenalty > 0 && gameState.currentPlayerIndex === gameState.players.findIndex(p => p.playerId === currentPlayer?.playerId)) { 
+                        drawBtnText = `${currentPlayer?.name} DRAWS ${gameState.drawPenalty}`; 
+                    } else { 
+                        drawBtnText = 'DRAW CARD'; 
+                    } 
+                } 
+            } else { 
+                drawBtnDisabled = true; 
+                drawBtnText = 'DRAW CARD'; 
+            } 
+            drawCardBtn.textContent = drawBtnText; 
+            drawCardBtn.disabled = drawBtnDisabled; 
+        }
     }
 
     // --- Helper for Action Bar Text ---

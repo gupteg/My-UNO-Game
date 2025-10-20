@@ -6,7 +6,11 @@ body {
   min-height: 100vh; /* Allows body to grow */
   box-sizing: border-box;
   color: #333;
-  overflow-x: hidden; /* Prevents horizontal scroll */
+  /* --- *** MODIFIED (C): Fix for mobile stacking context *** --- */
+  /* overflow-x: hidden; */ /* REMOVED THIS LINE */
+  width: 100%;
+  max-width: 100%;
+  /* --- *** END MODIFIED (C) *** --- */
 }
 
 #join-screen, #lobby-screen {
@@ -673,7 +677,8 @@ body {
 }
 
 /* --- *** MODIFIED (A): Add disabled state for button *** --- */
-.modal-buttons-container button:disabled, #next-round-ok-btn:disabled {
+.modal-buttons-container button:disabled, #next-round-ok-btn:disabled,
+.action-buttons button:disabled {
     background-color: #999;
     border-color: #777;
     color: #eee;
