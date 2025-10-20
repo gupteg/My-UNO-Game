@@ -144,7 +144,6 @@ body {
 #next-round-btn, #confirm-end-yes-btn, #final-score-ok-btn, #next-round-ok-btn, #im-back-btn, #discard-pile-ok-btn, #confirm-afk-yes-btn, #discard-wilds-ok-btn { background-color: #55aa55; border-color: #448844; color: white; }
 #end-game-round-btn, #confirm-end-no-btn, #confirm-afk-no-btn, #confirm-reset-no-btn { background-color: #ff5555; border-color: #cc4444; color: white; }
 
-/* --- *** MODIFIED: Toast Notification Styles *** --- */
 #toast-notification {
   position: fixed;
   bottom: 150px;
@@ -160,12 +159,11 @@ body {
   opacity: 0;
   transition: all 0.5s ease-in-out;
   pointer-events: none;
-  font-size: 2.7em;   /* Reduced from 3.6em */
-  white-space: normal; /* Allow wrapping */
-  max-width: 90%;    /* Prevent excessive width */
-  text-align: center; /* Center wrapped text */
+  font-size: 2.7em;
+  white-space: normal;
+  max-width: 90%;
+  text-align: center;
 }
-/* --- *** END MODIFIED *** --- */
 
 #toast-notification.show { opacity: 1; transform: translate(-50%, 10px); }
 .player-area.disconnected { opacity: 0.5; background-color: rgba(100, 100, 100, 0.2); border-color: #666 !important; box-shadow: none !important; }
