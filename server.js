@@ -206,13 +206,16 @@ io.on('connection', (socket) => {
           if (gameState && gameState.phase !== 'GameOver') {
               addLog(`The game has been ended early by the host.`);
               gameState.phase = 'GameOver';
+              const finalGamePlayers = [...gameState.players];
               io.emit('finalGameOver', gameState);
 
               if (gameOverToLobbyTimer) clearTimeout(gameOverToLobbyTimer);
 
               gameOverToLobbyTimer = setTimeout(() => {
-                  if (!gameState) return;
-                  players = gameState.players
+                  if (!gameState && !players.length) return; // Avoid error if hard reset happened during timeout
+
+                  // Use captured player data, ensure players array exists
+                  players = finalGamePlayers
                       .filter(p => p.status !== 'Removed')
                       .map(p => ({
                           playerId: p.playerId,
@@ -220,8 +223,18 @@ io.on('connection', (socket) => {
                           name: p.name,
                           isHost: p.isHost,
                           isReady: p.isHost,
-                          active: p.status !== 'Disconnected'
+                          active: true // Assume returning players are active
                       }));
+                  // Ensure host still exists if others were removed
+                  const hostExists = players.some(p => p.isHost);
+                  if (!hostExists && players.length > 0) {
+                      players[0].isHost = true; // Assign new host if needed
+                      players[0].isReady = true;
+                  } else if (hostExists) {
+                      const host = players.find(p=>p.isHost);
+                      if(host) host.isReady = true; // Ensure host is ready
+                  }
+
                   gameState = null;
                   io.emit('lobbyUpdate', players);
               }, 15000);
@@ -233,21 +246,8 @@ io.on('connection', (socket) => {
       }
   });
 
-  socket.on('endSession', () => {
-      if (gameState) return;
-      const host = players.find(p => p.socketId === socket.id && p.isHost);
-      if (host) {
-          console.log(`Host ${host.name} is ending the session.`);
-          players.forEach(p => {
-              if (p.socketId !== host.socketId) {
-                  io.to(p.socketId).emit('forceDisconnect');
-              }
-          });
-          players = [host];
-          host.isReady = true;
-          io.emit('lobbyUpdate', players);
-      }
-  });
+  // *** REMOVED: End Session Handler ***
+  // socket.on('endSession', () => { ... });
 
   socket.on('hardReset', () => {
       const host = (gameState ? gameState.players.find(p => p.socketId === socket.id && p.isHost) : null) || players.find(p => p.socketId === socket.id && p.isHost);
@@ -264,10 +264,12 @@ io.on('connection', (socket) => {
           reconnectTimers = {};
           if (gameOverToLobbyTimer) clearTimeout(gameOverToLobbyTimer);
           gameOverToLobbyTimer = null;
+          // Find the host object using the persistent ID to ensure we keep the correct player data
+          const hostData = currentPlayers.find(p => p.playerId === host.playerId);
           players = [{
-              playerId: host.playerId,
-              socketId: host.socketId,
-              name: host.name,
+              playerId: hostData.playerId,
+              socketId: host.socketId, // Use the current socket ID
+              name: hostData.name,
               isHost: true,
               isReady: true,
               active: true
@@ -280,7 +282,36 @@ io.on('connection', (socket) => {
   socket.on('playCard', ({ cardIndex }) => { if (!gameState || gameState.phase !== 'Playing' || gameState.isPaused) return; const playerIndex = gameState.players.findIndex(p => p.socketId === socket.id); if (playerIndex !== -1) { handleCardPlay(playerIndex, cardIndex); if (gameState && gameState.phase !== 'RoundOver' && gameState.phase !== 'GameOver') { io.emit('updateGameState', gameState); } } });
   socket.on('callUno', () => { if (!gameState || gameState.phase !== 'Playing' || gameState.isPaused) return; const player = gameState.players.find(p => p.socketId === socket.id); if (player && player.hand.length === 2 && gameState.players[gameState.currentPlayerIndex].playerId === player.playerId) { player.unoState = 'declared'; addLog(`📣 ${player.name} is ready to call UNO!`); io.emit('updateGameState', gameState); } });
   socket.on('drawCard', () => { if (!gameState || !['Playing'].includes(gameState.phase) || gameState.isPaused) return; const playerIndex = gameState.players.findIndex(p => p.socketId === socket.id); if (playerIndex === gameState.currentPlayerIndex) { const player = gameState.players[playerIndex]; const topCard = gameState.discardPile[0].card; if (gameState.pickUntilState?.active && gameState.pickUntilState.targetPlayerIndex === playerIndex) { if (gameState.drawPile.length > 0) { const drawnCard = gameState.drawPile.shift(); player.hand.push(drawnCard); io.emit('animateDraw', { playerId: player.playerId, count: 1 }); addLog(`› ${player.name} is picking for a ${gameState.pickUntilState.targetColor}...`); if (drawnCard.color === gameState.pickUntilState.targetColor) { player.hand.splice(player.hand.findIndex(c => c === drawnCard), 1); gameState.discardPile.unshift({ card: drawnCard, playerName: player.name }); gameState.activeColor = drawnCard.color; io.to(socket.id).emit('announce', `You drew the target color (${drawnCard.value} ${drawnCard.color}) and it was played for you.`); addLog(`› ${player.name} found and played a ${drawnCard.color} card.`); const pickUntilChooserId = gameState.pickUntilState.chooserPlayerId; gameState.pickUntilState = null; if (player.hand.length === 0) { const heldWinners = gameState.players.filter(p => gameState.winnerOnHold.includes(p.playerId)); handleEndOfRound([player, ...heldWinners]); return; } if (gameState.winnerOnHold.includes(pickUntilChooserId)) { const heldWinners = gameState.players.filter(p => gameState.winnerOnHold.includes(p.playerId)); handleEndOfRound(heldWinners); return; } applyCardEffect(drawnCard); const numActivePlayers = gameState.players.filter(p => p.status === 'Active').length; if (drawnCard.value === 'Skip' || (drawnCard.value === 'Reverse' && numActivePlayers === 2)) { advanceTurn(); } advanceTurn(); gameState.phase = 'Playing'; } else { player.unoState = 'safe'; } } else { addLog(`Draw pile empty! ${player.name} couldn't find the color.`); gameState.pickUntilState = null; advanceTurn(); gameState.phase = 'Playing'; } } else if (gameState.drawPenalty > 0) { const penalty = gameState.drawPenalty; for (let i = 0; i < penalty; i++) { if (gameState.drawPile.length > 0) player.hand.push(gameState.drawPile.shift()); } io.emit('animateDraw', { playerId: player.playerId, count: penalty }); addLog(`› ${player.name} drew ${penalty} cards.`); player.unoState = 'safe'; gameState.drawPenalty = 0; if (gameState.winnerOnHold.length > 0) { const heldWinners = gameState.players.filter(p => gameState.winnerOnHold.includes(p.playerId)); if (!heldWinners.some(w => w.playerId === player.playerId)) { handleEndOfRound(heldWinners); return; } else { gameState.winnerOnHold = []; } } advanceTurn(); gameState.phase = 'Playing'; } else { if (checkIfPlayerMustPlay(player, topCard, gameState.activeColor)) { io.to(socket.id).emit('announce', 'You have a playable card in your hand. You must play it.'); return; } if (gameState.drawPile.length > 0) { const drawnCard = gameState.drawPile.shift(); io.emit('animateDraw', { playerId: player.playerId, count: 1 }); addLog(`› ${player.name} drew a card.`); if (isMoveValid(drawnCard, topCard, gameState.activeColor, 0)) { if (drawnCard.color === 'Black') { player.hand.push(drawnCard); const cardIndex = player.hand.length - 1; io.to(socket.id).emit('updateGameState', gameState); io.to(socket.id).emit('drawnWildCard', { cardIndex, drawnCard }); return; } else { gameState.discardPile.unshift({ card: drawnCard, playerName: player.name }); gameState.activeColor = drawnCard.color; applyCardEffect(drawnCard); io.to(socket.id).emit('announce', `You drew a playable card (${drawnCard.value} ${drawnCard.color}) and it was played for you.`); addLog(`...and it was a playable ${drawnCard.color} ${drawnCard.value}!`); player.unoState = 'safe'; const numActivePlayers = gameState.players.filter(p => p.status === 'Active').length; if (drawnCard.value === 'Skip' || (drawnCard.value === 'Reverse' && numActivePlayers === 2)) { advanceTurn(); } advanceTurn(); gameState.phase = 'Playing'; } } else { player.hand.push(drawnCard); player.unoState = 'safe'; advanceTurn(); gameState.phase = 'Playing'; } } else { addLog(`Draw pile is empty! ${player.name} passes their turn.`); advanceTurn(); gameState.phase = 'Playing'; } } if (gameState.phase !== 'GameOver' && gameState.phase !== 'RoundOver' ) { io.emit('updateGameState', gameState); } } });
-  socket.on('choosePlayDrawnWild', ({ play, cardIndex }) => { if (!gameState || !['Playing'].includes(gameState.phase) || gameState.isPaused) return; const playerIndex = gameState.players.findIndex(p => p.socketId === socket.id); const player = gameState.players[playerIndex]; if (playerIndex !== gameState.currentPlayerIndex) return; if (play) { if (cardIndex !== player.hand.length - 1) { console.error("Drawn wild card index mismatch!"); return; } gameState.phase = 'Playing'; handleCardPlay(playerIndex, cardIndex); } else { addLog(`› ${player.name} chose to keep the drawn Wild card.`); advanceTurn(); gameState.phase = 'Playing'; } if (gameState && gameState.phase !== 'RoundOver' && gameState.phase !== 'GameOver') { io.emit('updateGameState', gameState); } });
+
+  // *** MODIFIED: Fix UNO Penalty (Scenario 4) ***
+  socket.on('choosePlayDrawnWild', ({ play, cardIndex }) => {
+      if (!gameState || !['Playing'].includes(gameState.phase) || gameState.isPaused) return;
+      const playerIndex = gameState.players.findIndex(p => p.socketId === socket.id);
+      const player = gameState.players[playerIndex];
+      if (playerIndex !== gameState.currentPlayerIndex) return;
+
+      if (play) {
+          if (cardIndex !== player.hand.length - 1) { // Basic validation
+              console.error("Drawn wild card index mismatch!");
+              return;
+          }
+          // If player had 1 card, drew this Wild (so now has 2), and plays it
+          if (player.hand.length === 2) {
+              player.unoState = 'declared'; // Mark as declared BEFORE playing
+          }
+          gameState.phase = 'Playing'; // Ensure phase is correct
+          handleCardPlay(playerIndex, cardIndex); // This will now correctly trigger unoCalled
+      } else {
+          addLog(`› ${player.name} chose to keep the drawn Wild card.`);
+          advanceTurn();
+          gameState.phase = 'Playing';
+      }
+
+      if (gameState && gameState.phase !== 'RoundOver' && gameState.phase !== 'GameOver') {
+          io.emit('updateGameState', gameState);
+      }
+  });
+
   socket.on('pickUntilChoice', ({ choice }) => { if (!gameState || gameState.phase !== 'ChoosingPickUntilAction' || gameState.isPaused) return; const player = gameState.players.find(p => p.socketId === socket.id); if (gameState.playerChoosingActionId !== player?.playerId) return; const numPlayers = gameState.players.length; const originalPlayerIndex = gameState.players.findIndex(p => p.socketId === socket.id); if (choice === 'discard-wilds') { const msg = `🌪️ ${player.name} chose 'All players discard Wilds'!`; addLog(msg); io.emit('announce', msg); const winners = []; const allDiscardedData = []; gameState.players.forEach(p => { if (p.socketId !== socket.id && p.status === 'Active') { const originalHandSize = p.hand.length; if (originalHandSize > 0) { const discardedCards = p.hand.filter(card => card.color === 'Black'); if (discardedCards.length > 0) allDiscardedData.push({ playerName: p.name, cards: discardedCards }); p.hand = p.hand.filter(card => card.color !== 'Black'); if (p.hand.length === 0) winners.push(p); else if (p.hand.length === 1 && originalHandSize > 1) { p.unoState = 'declared'; io.emit('unoCalled', { playerName: p.name }); } } } }); io.emit('showDiscardWildsModal', allDiscardedData); if (allDiscardedData.length === 0) addLog('...but no other players had any Wild cards.'); if (winners.length > 0) { const heldWinners = gameState.players.filter(p => gameState.winnerOnHold.includes(p.playerId)); handleEndOfRound([...winners, ...heldWinners]); return; } if (gameState.winnerOnHold.includes(player.playerId)) { const heldWinners = gameState.players.filter(p => gameState.winnerOnHold.includes(p.playerId)); handleEndOfRound(heldWinners); return; } gameState.phase = 'ChoosingColor'; } else if (choice === 'pick-color') { const msg = `🎨 ${player.name} chose 'Next player picks until color'.`; addLog(msg); io.emit('announce', msg); let nextPlayerIndex = -1; let searchIndex = originalPlayerIndex; let searchLimit = numPlayers; do { searchIndex = (searchIndex + gameState.playDirection + numPlayers) % numPlayers; if (gameState.players[searchIndex].status === 'Active') { nextPlayerIndex = searchIndex; break; } searchLimit--; } while (searchLimit > 0); if (nextPlayerIndex !== -1 && nextPlayerIndex !== originalPlayerIndex) { gameState.pickUntilState = { chooserPlayerId: player.playerId, targetPlayerIndex: nextPlayerIndex, active: false, targetColor: null }; gameState.phase = 'ChoosingColor'; } else { addLog('No other active players to target. Turn continues after color choice.'); gameState.pickUntilState = null; gameState.phase = 'ChoosingColor'; } } io.emit('updateGameState', gameState); });
   socket.on('swapHandsChoice', ({ targetPlayerId }) => { if (!gameState || gameState.phase !== 'ChoosingSwapHands' || gameState.isPaused) return; const choosingPlayer = gameState.players.find(p => p.socketId === socket.id); if (gameState.playerChoosingActionId !== choosingPlayer?.playerId) return; const targetPlayer = gameState.players.find(p => p.playerId === targetPlayerId && p.status === 'Active'); if (choosingPlayer && targetPlayer) { io.emit('animateSwap', { p1_id: choosingPlayer.playerId, p2_id: targetPlayer.playerId }); [choosingPlayer.hand, targetPlayer.hand] = [targetPlayer.hand, choosingPlayer.hand]; [choosingPlayer, targetPlayer].forEach(p => { if (p.hand.length === 1) { p.unoState = 'declared'; io.emit('unoCalled', { playerName: p.name }); } else { p.unoState = 'safe'; } }); const msg = `🤝 ${choosingPlayer.name} swapped hands with ${targetPlayer.name}!`; addLog(msg); io.emit('announce', msg); gameState.playerChoosingActionId = null; gameState.swapState = null; advanceTurn(); gameState.phase = 'Playing'; } else { addLog(`Target player ${targetPlayerId} not found or not active.`); gameState.phase = 'Playing'; advanceTurn(); } io.emit('updateGameState', gameState); });
   socket.on('colorChosen', ({ color }) => { if (!gameState || gameState.phase !== 'ChoosingColor' || gameState.isPaused) return; const choosingPlayer = gameState.players.find(p => p.socketId === socket.id); if (gameState.playerChoosingActionId !== choosingPlayer?.playerId) return; addLog(`🎨 ${choosingPlayer.name} chose the color ${color}.`); gameState.activeColor = color; const wasDealerChoosingFirstCard = gameState.discardPile.length === 1 && gameState.players[gameState.dealerIndex].playerId === choosingPlayer.playerId; if (gameState.swapState) { gameState.phase = 'ChoosingSwapHands'; } else if (gameState.pickUntilState) { gameState.pickUntilState.active = true; gameState.pickUntilState.targetColor = color; gameState.currentPlayerIndex = gameState.pickUntilState.targetPlayerIndex; const targetPlayer = gameState.players[gameState.pickUntilState.targetPlayerIndex]; const msg = `› ${targetPlayer.name} must now pick until they find a ${color} card!`; addLog(msg); io.emit('announce', msg); gameState.phase = 'Playing'; gameState.playerChoosingActionId = null; } else { let announceMsg = ''; const playedCard = gameState.discardPile[0]?.card; if (!wasDealerChoosingFirstCard && playedCard) { if (playedCard.value === 'Wild Draw Four') { announceMsg = `✨ ${choosingPlayer.name} played Wild Draw Four and chose ${color}.`; } else if (playedCard.value === 'Wild') { announceMsg = `✨ ${choosingPlayer.name} played Wild and chose ${color}.`; } else { announceMsg = `✨ ${choosingPlayer.name} chose ${color}.`; } io.emit('announce', announceMsg); } if (!wasDealerChoosingFirstCard) { advanceTurn(); } gameState.phase = 'Playing'; gameState.playerChoosingActionId = null; } io.emit('updateGameState', gameState); });
@@ -315,6 +346,8 @@ io.on('connection', (socket) => {
                 const nextHost = players.find(p => p.active);
                 if (nextHost) {
                     nextHost.isHost = true;
+                    // *** Make new host ready ***
+                    nextHost.isReady = true;
                     hostLeft = true;
                 }
             }
@@ -328,7 +361,7 @@ io.on('connection', (socket) => {
     }
   });
 
-}); // <<< --- CORRECTED: Added missing closing brace and parenthesis
+}); // End of io.on('connection', ...)
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => { console.log(`✅ UNO Server is live and listening on port ${PORT}`); });
