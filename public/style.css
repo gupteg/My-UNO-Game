@@ -650,6 +650,18 @@ body {
     text-shadow: 1px 1px 2px black;
 }
 
+/* --- *** NEW (C): Style for Drawn Wild Card Name *** --- */
+#drawn-wild-card-name {
+    font-size: 1.4em;
+    font-weight: bold;
+    color: #ffc107; /* Bright yellow */
+    text-shadow: 1px 1px 2px black;
+    margin: 10px 0;
+    text-transform: uppercase;
+}
+/* --- *** END NEW (C) *** --- */
+
+
 .modal-buttons-container button, #next-round-ok-btn {
     font-weight: bold;
     color: #333;
@@ -660,7 +672,18 @@ body {
     cursor: pointer; /* Ensure buttons look clickable */
 }
 
-.modal-buttons-container button:hover, #next-round-ok-btn:hover {
+/* --- *** MODIFIED (A): Add disabled state for button *** --- */
+.modal-buttons-container button:disabled, #next-round-ok-btn:disabled {
+    background-color: #999;
+    border-color: #777;
+    color: #eee;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+
+.modal-buttons-container button:hover, #next-round-ok-btn:hover:not(:disabled) {
     transform: scale(1.05);
     box-shadow: 0 4px 8px rgba(0,0,0,0.3);
 }
@@ -687,7 +710,21 @@ body {
     background-color: #fffbe6;
     color: #997000;
     font-weight: bold;
+    /* --- *** NEW (B): Enhanced winner row style *** --- */
+    animation: pulse-gold 2s infinite ease-in-out;
 }
+
+@keyframes pulse-gold {
+  0%, 100% {
+    background-color: #fffbe6;
+    box-shadow: 0 0 5px #ffc107;
+  }
+  50% {
+    background-color: #fff5cc;
+    box-shadow: 0 0 15px #ffc107;
+  }
+}
+
 
 #toast-notification {
   position: fixed; /* Use fixed for viewport positioning */
@@ -952,3 +989,89 @@ body {
     font-style: italic;
 }
 /* --- END CHANGE C --- */
+
+
+/* --- *** NEW (B): CELEBRATION STYLES *** --- */
+
+.confetti {
+    position: fixed;
+    top: -10px;
+    width: 10px;
+    height: 10px;
+    background-color: #f00;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 9999;
+    animation: confetti-fall 5s ease-out forwards;
+}
+
+@keyframes confetti-fall {
+    0% {
+        opacity: 1;
+        transform: translateY(0) rotate(0deg);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(110vh) 
+                   translateX(var(--x-end)) 
+                   rotate(720deg);
+    }
+}
+
+.firework {
+    position: fixed;
+    width: 4px;
+    height: 4px;
+    background-color: white;
+    border-radius: 50%;
+    box-shadow: 0 0 10px 2px white;
+    opacity: 1;
+    z-index: 9998;
+    pointer-events: none;
+    animation: firework-explode 0.8s ease-out forwards;
+}
+
+.firework::before, .firework::after {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: inherit;
+    border-radius: inherit;
+    box-shadow: inherit;
+}
+
+@keyframes firework-explode {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(25); /* Size of the explosion */
+        opacity: 0;
+    }
+}
+
+.firework-particle {
+    position: fixed;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    z-index: 9998;
+    pointer-events: none;
+    animation: firework-particle-fade 1s ease-out forwards;
+}
+
+@keyframes firework-particle-fade {
+    0% {
+        opacity: 1;
+        transform: translate(0, 0);
+    }
+    100% {
+        opacity: 0;
+        /* Custom properties --vx and --vy are set by JS */
+        transform: translate(var(--vx), calc(var(--vy) + 30px)); /* Added gravity */
+    }
+}
+
+/* --- *** END NEW (B) *** --- */
