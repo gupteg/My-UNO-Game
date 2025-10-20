@@ -17,11 +17,24 @@
     <div id="lobby-screen" style="display: none;">
         <h2>Game Lobby</h2>
         <h3>Players:</h3>
-        <ul id="player-list"></ul>
-        <button id="start-game-btn">Start Game</button>
+        <ul id="player-list">
+            </ul>
+
+        <div id="player-lobby-actions" class="lobby-actions" style="display: none;">
+            <button id="ready-btn">Ready</button>
+        </div>
+
+        <div id="host-lobby-actions" class="lobby-actions" style="display: none;">
+            <div id="host-controls">
+                <input type="password" id="host-password-input" placeholder="Host Password (Optional)">
+                <button id="start-game-btn">Start Game</button>
+                <button id="end-session-btn">End Session</button>
+                <button id="hard-reset-btn" class="danger-btn">Hard Reset</button>
+            </div>
+        </div>
+
         <p id="host-message" style="display: none;">(Waiting for the host to start the game)</p>
     </div>
-
     <div id="game-board" style="display: none;">
         <div id="action-bar">Waiting for game to start...</div>
 
@@ -50,7 +63,7 @@
     <div id="color-picker-modal" class="modal" style="display: none;"><div class="modal-content"><h3>Choose the next color:</h3><div class="color-options"><button class="color-btn" data-color="Red"></button><button class="color-btn" data-color="Green"></button><button class="color-btn" data-color="Blue"></button><button class="color-btn" data-color="Yellow"></button></div></div></div>
     <div id="pick-until-modal" class="modal" style="display: none;"><div class="modal-content"><h3>Choose an action for Wild Pick Until:</h3><div class="action-options"><button id="option-pick-color">Next player picks until color</button><button id="option-discard-wilds">All players discard Wilds</button></div></div></div>
     <div id="swap-modal" class="modal" style="display: none;"><div id="swap-modal-content" class="modal-content"><h3>Choose a player to swap hands with:</h3><div id="swap-player-options" class="action-options"></div></div></div>
-    
+
     <div id="drawn-wild-modal" class="modal" style="display: none;">
         <div class="modal-content">
             <h3>You drew a playable Wild card!</h3>
@@ -61,7 +74,7 @@
             </div>
         </div>
     </div>
-    
+
     <div id="deal-choice-modal" class="modal" style="display: none;"><div class="modal-content"><h3>You are the dealer!</h3><p>Choose how many cards to deal for this round:</p><input type="number" id="deal-cards-input" value="7" min="1" max="13"><button id="deal-cards-btn">Deal Cards</button></div></div>
 
     <div id="confirm-end-game-modal" class="modal" style="display: none;">
@@ -75,6 +88,16 @@
         </div>
     </div>
 
+    <div id="confirm-hard-reset-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3>Hard Reset Session</h3>
+            <p>Are you sure? This will end any active game and remove all other players from the lobby.</p>
+            <div class="modal-buttons-container">
+                <button id="confirm-reset-yes-btn" class="danger-btn">Yes, Hard Reset</button>
+                <button id="confirm-reset-no-btn">No, Cancel</button>
+            </div>
+        </div>
+    </div>
     <div id="final-score-modal" class="modal" style="display: none;">
         <div class="modal-content wide">
             <h2 id="final-winner-message"></h2>
