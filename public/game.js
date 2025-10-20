@@ -6,6 +6,7 @@ window.addEventListener('DOMContentLoaded', () => {
     let isGameOver = false;
     let countdownInterval = null;
     let playerIdToMarkAFK = null;
+    // window.expectingLobbyUpdate = false; // Flag no longer needed here
 
     // --- SCREEN & ELEMENT REFERENCES ---
     const joinScreen = document.getElementById('join-screen');
@@ -117,7 +118,6 @@ window.addEventListener('DOMContentLoaded', () => {
         socket.emit('endGame');
     });
 
-    // *** MODIFIED: Show wait message instead of hiding modal ***
     finalScoreOkBtn.addEventListener('click', () => {
         finalScoreOkBtn.disabled = true; // Disable button
         if (lobbyWaitMessage) {
@@ -125,7 +125,6 @@ window.addEventListener('DOMContentLoaded', () => {
             lobbyWaitMessage.style.display = 'block'; // Show message
         }
         isGameOver = false; // Allow lobby rendering later
-        // Modal is NOT hidden here anymore
     });
 
     unoBtn.addEventListener('click', () => { socket.emit('callUno'); unoBtn.classList.add('pressed'); setTimeout(() => unoBtn.classList.remove('pressed'), 300); });
@@ -144,10 +143,38 @@ window.addEventListener('DOMContentLoaded', () => {
 
     // --- EVENT LISTENERS (Receiving messages from server) ---
 
-    socket.on('connect', () => { /* ... (unchanged) ... */ console.log('Socket connected with ID:', socket.id); if (myPersistentPlayerId) { console.log('Attempting to rejoin with existing ID:', myPersistentPlayerId); const savedName = sessionStorage.getItem('unoPlayerName') || playerNameInput.value.trim() || "Player"; playerNameInput.value = savedName; socket.emit('joinGame', { playerName: savedName, playerId: myPersistentPlayerId }); } else { const savedName = sessionStorage.getItem('unoPlayerName'); if (savedName) playerNameInput.value = savedName; } });
-    socket.on('joinSuccess', ({ playerId, lobby }) => { /* ... (unchanged) ... */ console.log('Successfully joined/registered with ID:', playerId); myPersistentPlayerId = playerId; sessionStorage.setItem('unoPlayerId', playerId); const me = lobby.find(p => p.playerId === playerId); if (me) { sessionStorage.setItem('unoPlayerName', me.name); playerNameInput.value = me.name; } renderLobby(lobby); });
+    socket.on('connect', () => { console.log('Socket connected with ID:', socket.id); if (myPersistentPlayerId) { console.log('Attempting to rejoin with existing ID:', myPersistentPlayerId); const savedName = sessionStorage.getItem('unoPlayerName') || playerNameInput.value.trim() || "Player"; playerNameInput.value = savedName; socket.emit('joinGame', { playerName: savedName, playerId: myPersistentPlayerId }); } else { const savedName = sessionStorage.getItem('unoPlayerName'); if (savedName) playerNameInput.value = savedName; } });
 
-    // *** MODIFIED: Hide wait message on lobby update ***
+    // *** MODIFIED: Rejoin Handling ***
+    socket.on('joinSuccess', ({ playerId, lobby }) => {
+        console.log('Successfully joined/rejoined with ID:', playerId);
+        joinScreen.style.display = 'none'; // Ensure join screen is hidden on success
+        myPersistentPlayerId = playerId;
+        sessionStorage.setItem('unoPlayerId', playerId);
+        const me = lobby.find(p => p.playerId === playerId);
+        if (me) {
+            sessionStorage.setItem('unoPlayerName', me.name);
+            playerNameInput.value = me.name;
+        }
+
+        // Determine if this 'joinSuccess' is for joining the lobby or rejoining a game
+        // We check if gameState exists on the client AND if the lobby array came from gameState.players
+        const isRejoiningGame = window.gameState && window.gameState.players && lobby.some(lobbyPlayer => window.gameState.players.some(gamePlayer => gamePlayer.playerId === lobbyPlayer.playerId));
+
+        if (isRejoiningGame) {
+            // Game is in progress, hide lobby and wait for updateGameState
+            console.log("JoinSuccess received while game in progress (rejoin). Hiding lobby.");
+            lobbyScreen.style.display = 'none';
+        } else {
+            // Joining lobby, render it
+             console.log("JoinSuccess received for lobby. Rendering lobby.");
+            renderLobby(lobby);
+            lobbyScreen.style.display = 'block'; // Make sure lobby is visible
+            gameBoard.style.display = 'none'; // Hide game board if it was somehow visible
+        }
+    });
+    // *** END MODIFIED ***
+
     socket.on('lobbyUpdate', (currentLobbyPlayers) => {
         console.log('Received lobbyUpdate from server.');
         // Hide final score modal and reset its state completely when lobby update arrives
@@ -158,37 +185,32 @@ window.addEventListener('DOMContentLoaded', () => {
         }
         isGameOver = false; // Ensure lobby can render
 
-        if (!window.gameState || window.gameState.phase === 'Lobby' || window.gameState.phase === 'GameOver') {
+        // Only render lobby if we are not currently in an active game OR if we explicitly received lobby data
+        if (!window.gameState || window.gameState.phase === 'Lobby' || window.gameState.phase === 'GameOver' || currentLobbyPlayers) {
             renderLobby(currentLobbyPlayers);
             joinScreen.style.display = 'none';
             gameBoard.style.display = 'none';
             lobbyScreen.style.display = 'block';
             endOfRoundDiv.style.display = 'none';
             // finalScoreModal.style.display = 'none'; // Already hidden above
-            window.gameState = null;
+            window.gameState = null; // Clear game state when definitely back in lobby
         }
     });
 
-    socket.on('forceDisconnect', () => { /* ... (unchanged) ... */ console.log("Received force disconnect from server."); showToast("You have been disconnected by the host."); sessionStorage.removeItem('unoPlayerId'); sessionStorage.removeItem('unoPlayerName'); myPersistentPlayerId = null; setTimeout(() => { location.reload(); }, 1500); });
-    socket.on('updateGameState', (gameState) => { /* ... (unchanged) ... */ window.gameState = gameState; if (gameState.phase === 'Lobby') { console.warn("Received gameState update with phase 'Lobby', rendering lobby."); renderLobby(gameState.players); joinScreen.style.display = 'none'; gameBoard.style.display = 'none'; lobbyScreen.style.display = 'block'; } else if (gameState.phase === 'GameOver') { /* finalGameOver handles this */ } else { joinScreen.style.display = 'none'; lobbyScreen.style.display = 'none'; gameBoard.style.display = 'flex'; displayGame(gameState); } });
-    socket.on('announceRoundWinner', ({ winnerNames }) => { /* ... (unchanged) ... */ let message = `${winnerNames} wins the round!`; if (winnerNames.includes(' and ')) { message = `${winnerNames} win the round!`; } showUnoAnnouncement(message); triggerConfetti(false); });
-    socket.on('roundOver', ({ winnerName, scores, finalGameState }) => { /* ... (unchanged) ... */ window.gameState = finalGameState; setTimeout(() => { displayGame(finalGameState); document.getElementById('winner-message').textContent = `${winnerName} win(s) the round!`; const scoresDisplay = document.getElementById('scores-display'); scoresDisplay.innerHTML = '<h3>Round Scores</h3>'; const scoreTable = document.createElement('table'); scoreTable.className = 'score-table'; let tableHTML = '<thead><tr><th>Player</th><th>Hand Score</th><th>Total Score</th></tr></thead><tbody>'; finalGameState.players.sort((a,b) => a.score - b.score).forEach(p => { const roundScoreForPlayer = p.scoresByRound[p.scoresByRound.length - 1]; const isWinner = winnerName.includes(p.name); tableHTML += `<tr class="${isWinner ? 'winner-row' : ''}"><td>${p.name}</td><td>${roundScoreForPlayer}</td><td>${p.score}</td></tr>`; }); tableHTML += '</tbody>'; scoreTable.innerHTML = tableHTML; scoresDisplay.appendChild(scoreTable); }, 1500); });
-
-    // *** NEW: Announce final winner before showing scores ***
-    socket.on('announceFinalWinner', ({ winnerNames }) => {
-        const message = `${winnerNames} WIN(S) THE GAME!`;
-        showToast(message); // Show the toast first
-    });
-
-    socket.on('finalGameOver', (finalGameState) => { /* ... (unchanged, shows scores/fireworks after announce) ... */ isGameOver = true; window.gameState = finalGameState; gameBoard.style.display = 'none'; endOfRoundDiv.style.display = 'none'; renderFinalScores(finalGameState); finalScoreModal.style.display = 'flex'; triggerConfetti(true); triggerFireworks(); });
-    socket.on('drawnWildCard', ({ cardIndex, drawnCard }) => { /* ... (unchanged) ... */ const drawnWildCardName = document.getElementById('drawn-wild-card-name'); if (drawnWildCardName) { const cardName = drawnCard.value.replace(/([A-Z])/g, ' $1').trim().toUpperCase(); drawnWildCardName.textContent = `YOU DREW A ${cardName}!`; } drawnWildModal.dataset.cardIndex = cardIndex; drawnWildModal.style.display = 'flex'; });
-    socket.on('announce', (message) => { /* ... (unchanged) ... */ showToast(message); });
-    socket.on('youWereMarkedAFK', () => { /* ... (unchanged) ... */ afkNotificationModal.style.display = 'flex'; });
-    socket.on('unoCalled', ({ playerName }) => { /* ... (unchanged) ... */ showUnoAnnouncement(`${playerName} says UNO!`); });
-    socket.on('showDiscardWildsModal', (allDiscardedData) => { /* ... (unchanged) ... */ discardWildsResults.innerHTML = ''; if (allDiscardedData.length === 0) { discardWildsResults.innerHTML = '<h3 class="discard-wilds-empty-msg">...but no other players had any Wild cards!</h3>'; } else { allDiscardedData.forEach(playerData => { const playerGroup = document.createElement('div'); playerGroup.className = 'discard-result-player'; const playerName = document.createElement('p'); playerName.className = 'discard-result-player-name'; playerName.textContent = `${playerData.playerName} discarded:`; playerGroup.appendChild(playerName); const cardContainer = document.createElement('div'); cardContainer.className = 'discard-result-cards'; if (playerData.cards.length === 0) { const noCardsMsg = document.createElement('span'); noCardsMsg.textContent = '(No cards)'; cardContainer.appendChild(noCardsMsg); } else { playerData.cards.forEach(card => { const cardEl = createCardElement(card, -1); cardContainer.appendChild(cardEl); }); } playerGroup.appendChild(cardContainer); discardWildsResults.appendChild(playerGroup); }); } discardWildsModal.style.display = 'flex'; });
-    socket.on('animateDraw', ({ playerId, count }) => { /* ... (unchanged) ... */ animateCardDraw(playerId, count); });
-    socket.on('animateSwap', ({ p1_id, p2_id }) => { /* ... (unchanged) ... */ animateHandSwap(p1_id, p2_id); });
-    socket.on('animatePlay', ({ playerId, card, cardIndex }) => { /* ... (unchanged) ... */ animateCardPlay(playerId, card, cardIndex); });
+    socket.on('forceDisconnect', () => { console.log("Received force disconnect from server."); showToast("You have been disconnected by the host."); sessionStorage.removeItem('unoPlayerId'); sessionStorage.removeItem('unoPlayerName'); myPersistentPlayerId = null; setTimeout(() => { location.reload(); }, 1500); });
+    socket.on('updateGameState', (gameState) => { window.gameState = gameState; if (gameState.phase === 'Lobby') { console.warn("Received gameState update with phase 'Lobby', rendering lobby."); renderLobby(gameState.players); joinScreen.style.display = 'none'; gameBoard.style.display = 'none'; lobbyScreen.style.display = 'block'; } else if (gameState.phase === 'GameOver') { /* finalGameOver handles this */ } else { joinScreen.style.display = 'none'; lobbyScreen.style.display = 'none'; gameBoard.style.display = 'flex'; displayGame(gameState); } });
+    socket.on('announceRoundWinner', ({ winnerNames }) => { let message = `${winnerNames} wins the round!`; if (winnerNames.includes(' and ')) { message = `${winnerNames} win the round!`; } showUnoAnnouncement(message); triggerConfetti(false); });
+    socket.on('roundOver', ({ winnerName, scores, finalGameState }) => { window.gameState = finalGameState; setTimeout(() => { displayGame(finalGameState); document.getElementById('winner-message').textContent = `${winnerName} win(s) the round!`; const scoresDisplay = document.getElementById('scores-display'); scoresDisplay.innerHTML = '<h3>Round Scores</h3>'; const scoreTable = document.createElement('table'); scoreTable.className = 'score-table'; let tableHTML = '<thead><tr><th>Player</th><th>Hand Score</th><th>Total Score</th></tr></thead><tbody>'; finalGameState.players.sort((a,b) => a.score - b.score).forEach(p => { const roundScoreForPlayer = p.scoresByRound[p.scoresByRound.length - 1]; const isWinner = winnerName.includes(p.name); tableHTML += `<tr class="${isWinner ? 'winner-row' : ''}"><td>${p.name}</td><td>${roundScoreForPlayer}</td><td>${p.score}</td></tr>`; }); tableHTML += '</tbody>'; scoreTable.innerHTML = tableHTML; scoresDisplay.appendChild(scoreTable); }, 1500); });
+    socket.on('announceFinalWinner', ({ winnerNames }) => { const message = `${winnerNames} WIN(S) THE GAME!`; showToast(message); });
+    socket.on('finalGameOver', (finalGameState) => { isGameOver = true; window.gameState = finalGameState; gameBoard.style.display = 'none'; endOfRoundDiv.style.display = 'none'; renderFinalScores(finalGameState); finalScoreModal.style.display = 'flex'; triggerConfetti(true); triggerFireworks(); });
+    socket.on('drawnWildCard', ({ cardIndex, drawnCard }) => { const drawnWildCardName = document.getElementById('drawn-wild-card-name'); if (drawnWildCardName) { const cardName = drawnCard.value.replace(/([A-Z])/g, ' $1').trim().toUpperCase(); drawnWildCardName.textContent = `YOU DREW A ${cardName}!`; } drawnWildModal.dataset.cardIndex = cardIndex; drawnWildModal.style.display = 'flex'; });
+    socket.on('announce', (message) => { showToast(message); });
+    socket.on('youWereMarkedAFK', () => { afkNotificationModal.style.display = 'flex'; });
+    socket.on('unoCalled', ({ playerName }) => { showUnoAnnouncement(`${playerName} says UNO!`); });
+    socket.on('showDiscardWildsModal', (allDiscardedData) => { discardWildsResults.innerHTML = ''; if (allDiscardedData.length === 0) { discardWildsResults.innerHTML = '<h3 class="discard-wilds-empty-msg">...but no other players had any Wild cards!</h3>'; } else { allDiscardedData.forEach(playerData => { const playerGroup = document.createElement('div'); playerGroup.className = 'discard-result-player'; const playerName = document.createElement('p'); playerName.className = 'discard-result-player-name'; playerName.textContent = `${playerData.playerName} discarded:`; playerGroup.appendChild(playerName); const cardContainer = document.createElement('div'); cardContainer.className = 'discard-result-cards'; if (playerData.cards.length === 0) { const noCardsMsg = document.createElement('span'); noCardsMsg.textContent = '(No cards)'; cardContainer.appendChild(noCardsMsg); } else { playerData.cards.forEach(card => { const cardEl = createCardElement(card, -1); cardContainer.appendChild(cardEl); }); } playerGroup.appendChild(cardContainer); discardWildsResults.appendChild(playerGroup); }); } discardWildsModal.style.display = 'flex'; });
+    socket.on('animateDraw', ({ playerId, count }) => { animateCardDraw(playerId, count); });
+    socket.on('animateSwap', ({ p1_id, p2_id }) => { animateHandSwap(p1_id, p2_id); });
+    socket.on('animatePlay', ({ playerId, card, cardIndex }) => { animateCardPlay(playerId, card, cardIndex); });
 
 
     // --- ALL DISPLAY AND HELPER FUNCTIONS ---
