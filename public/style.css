@@ -122,6 +122,7 @@ body {
   padding-right: 10px;
 }
 
+/* --- *** MODIFIED: Right Column Fix *** --- */
 #right-column {
   flex: 1;
   display: flex;
@@ -133,7 +134,11 @@ body {
   background-color: rgba(0,0,0,0.2);
   border-radius: 10px;
   overflow-y: auto;
+  min-width: 420px; /* Prevent compression */
+  overflow-x: hidden; /* Clip internal overflow */
 }
+/* --- *** END MODIFIED *** --- */
+
 
 .player-area {
   padding: 10px;
@@ -881,6 +886,7 @@ body {
         overflow-y: visible;
     }
 
+    /* --- *** MODIFIED: Right Column Fix *** --- */
     #right-column {
         flex: none;
         width: 100%;
@@ -889,7 +895,10 @@ body {
         gap: 15px;
         padding: 5px 0;
         overflow-y: visible;
+        min-width: 0; /* Reset min-width for mobile */
+        overflow-x: visible; /* Reset overflow for mobile */
     }
+    /* --- *** END MODIFIED *** --- */
 
     .player-area {
         width: 100%;
