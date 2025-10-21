@@ -6,7 +6,6 @@ window.addEventListener('DOMContentLoaded', () => {
     let isGameOver = false;
     let countdownInterval = null;
     let playerIdToMarkAFK = null;
-    // window.expectingLobbyUpdate = false; // Flag no longer needed here
 
     // --- SCREEN & ELEMENT REFERENCES ---
     const joinScreen = document.getElementById('join-screen');
@@ -67,7 +66,7 @@ window.addEventListener('DOMContentLoaded', () => {
     const confirmHardResetModal = document.getElementById('confirm-hard-reset-modal');
     const confirmResetYesBtn = document.getElementById('confirm-reset-yes-btn');
     const confirmResetNoBtn = document.getElementById('confirm-reset-no-btn');
-    const lobbyWaitMessage = document.getElementById('lobby-wait-message'); // Get wait message element
+    const lobbyWaitMessage = document.getElementById('lobby-wait-message');
 
 
     joinScreen.style.display = 'block';
@@ -144,8 +143,6 @@ window.addEventListener('DOMContentLoaded', () => {
     // --- EVENT LISTENERS (Receiving messages from server) ---
 
     socket.on('connect', () => { console.log('Socket connected with ID:', socket.id); if (myPersistentPlayerId) { console.log('Attempting to rejoin with existing ID:', myPersistentPlayerId); const savedName = sessionStorage.getItem('unoPlayerName') || playerNameInput.value.trim() || "Player"; playerNameInput.value = savedName; socket.emit('joinGame', { playerName: savedName, playerId: myPersistentPlayerId }); } else { const savedName = sessionStorage.getItem('unoPlayerName'); if (savedName) playerNameInput.value = savedName; } });
-
-    // *** MODIFIED: Rejoin Handling ***
     socket.on('joinSuccess', ({ playerId, lobby }) => {
         console.log('Successfully joined/rejoined with ID:', playerId);
         joinScreen.style.display = 'none'; // Ensure join screen is hidden on success
@@ -156,47 +153,32 @@ window.addEventListener('DOMContentLoaded', () => {
             sessionStorage.setItem('unoPlayerName', me.name);
             playerNameInput.value = me.name;
         }
-
-        // Determine if this 'joinSuccess' is for joining the lobby or rejoining a game
-        // We check if gameState exists on the client AND if the lobby array came from gameState.players
         const isRejoiningGame = window.gameState && window.gameState.players && lobby.some(lobbyPlayer => window.gameState.players.some(gamePlayer => gamePlayer.playerId === lobbyPlayer.playerId));
-
         if (isRejoiningGame) {
-            // Game is in progress, hide lobby and wait for updateGameState
             console.log("JoinSuccess received while game in progress (rejoin). Hiding lobby.");
             lobbyScreen.style.display = 'none';
         } else {
-            // Joining lobby, render it
              console.log("JoinSuccess received for lobby. Rendering lobby.");
             renderLobby(lobby);
-            lobbyScreen.style.display = 'block'; // Make sure lobby is visible
-            gameBoard.style.display = 'none'; // Hide game board if it was somehow visible
+            lobbyScreen.style.display = 'block';
+            gameBoard.style.display = 'none';
         }
     });
-    // *** END MODIFIED ***
-
     socket.on('lobbyUpdate', (currentLobbyPlayers) => {
         console.log('Received lobbyUpdate from server.');
-        // Hide final score modal and reset its state completely when lobby update arrives
         finalScoreModal.style.display = 'none';
         finalScoreOkBtn.disabled = false;
-        if (lobbyWaitMessage) {
-            lobbyWaitMessage.style.display = 'none';
-        }
-        isGameOver = false; // Ensure lobby can render
-
-        // Only render lobby if we are not currently in an active game OR if we explicitly received lobby data
+        if (lobbyWaitMessage) { lobbyWaitMessage.style.display = 'none'; }
+        isGameOver = false;
         if (!window.gameState || window.gameState.phase === 'Lobby' || window.gameState.phase === 'GameOver' || currentLobbyPlayers) {
             renderLobby(currentLobbyPlayers);
             joinScreen.style.display = 'none';
             gameBoard.style.display = 'none';
             lobbyScreen.style.display = 'block';
             endOfRoundDiv.style.display = 'none';
-            // finalScoreModal.style.display = 'none'; // Already hidden above
-            window.gameState = null; // Clear game state when definitely back in lobby
+            window.gameState = null;
         }
     });
-
     socket.on('forceDisconnect', () => { console.log("Received force disconnect from server."); showToast("You have been disconnected by the host."); sessionStorage.removeItem('unoPlayerId'); sessionStorage.removeItem('unoPlayerName'); myPersistentPlayerId = null; setTimeout(() => { location.reload(); }, 1500); });
     socket.on('updateGameState', (gameState) => { window.gameState = gameState; if (gameState.phase === 'Lobby') { console.warn("Received gameState update with phase 'Lobby', rendering lobby."); renderLobby(gameState.players); joinScreen.style.display = 'none'; gameBoard.style.display = 'none'; lobbyScreen.style.display = 'block'; } else if (gameState.phase === 'GameOver') { /* finalGameOver handles this */ } else { joinScreen.style.display = 'none'; lobbyScreen.style.display = 'none'; gameBoard.style.display = 'flex'; displayGame(gameState); } });
     socket.on('announceRoundWinner', ({ winnerNames }) => { let message = `${winnerNames} wins the round!`; if (winnerNames.includes(' and ')) { message = `${winnerNames} win the round!`; } showUnoAnnouncement(message); triggerConfetti(false); });
@@ -207,6 +189,10 @@ window.addEventListener('DOMContentLoaded', () => {
     socket.on('announce', (message) => { showToast(message); });
     socket.on('youWereMarkedAFK', () => { afkNotificationModal.style.display = 'flex'; });
     socket.on('unoCalled', ({ playerName }) => { showUnoAnnouncement(`${playerName} says UNO!`); });
+    // *** NEW: Listener for successful UNO declaration ***
+    socket.on('unoDeclarationSuccess', () => {
+        showToast("You are ready to say UNO!");
+    });
     socket.on('showDiscardWildsModal', (allDiscardedData) => { discardWildsResults.innerHTML = ''; if (allDiscardedData.length === 0) { discardWildsResults.innerHTML = '<h3 class="discard-wilds-empty-msg">...but no other players had any Wild cards!</h3>'; } else { allDiscardedData.forEach(playerData => { const playerGroup = document.createElement('div'); playerGroup.className = 'discard-result-player'; const playerName = document.createElement('p'); playerName.className = 'discard-result-player-name'; playerName.textContent = `${playerData.playerName} discarded:`; playerGroup.appendChild(playerName); const cardContainer = document.createElement('div'); cardContainer.className = 'discard-result-cards'; if (playerData.cards.length === 0) { const noCardsMsg = document.createElement('span'); noCardsMsg.textContent = '(No cards)'; cardContainer.appendChild(noCardsMsg); } else { playerData.cards.forEach(card => { const cardEl = createCardElement(card, -1); cardContainer.appendChild(cardEl); }); } playerGroup.appendChild(cardContainer); discardWildsResults.appendChild(playerGroup); }); } discardWildsModal.style.display = 'flex'; });
     socket.on('animateDraw', ({ playerId, count }) => { animateCardDraw(playerId, count); });
     socket.on('animateSwap', ({ p1_id, p2_id }) => { animateHandSwap(p1_id, p2_id); });
@@ -214,7 +200,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
 
     // --- ALL DISPLAY AND HELPER FUNCTIONS ---
-    function renderLobby(currentLobbyPlayers) { /* ... (unchanged) ... */ const me = currentLobbyPlayers.find(p => p.playerId === myPersistentPlayerId); if (!me && sessionStorage.getItem('unoPlayerId')) { showToast("You may have been kicked or the session ended."); sessionStorage.removeItem('unoPlayerId'); sessionStorage.removeItem('unoPlayerName'); myPersistentPlayerId = null; setTimeout(() => { location.reload(); }, 1500); return; } if (!me) { console.error("Could not find player data in lobby."); joinScreen.style.display = 'block'; lobbyScreen.style.display = 'none'; gameBoard.style.display = 'none'; return; } joinScreen.style.display = 'none'; lobbyScreen.style.display = 'block'; gameBoard.style.display = 'none'; endOfRoundDiv.style.display = 'none'; finalScoreModal.style.display = 'none'; if (gameLogList) gameLogList.innerHTML = ''; playerList.innerHTML = ''; let amIHost = me.isHost; currentLobbyPlayers.forEach(player => { if (!player.active) return; const playerItem = document.createElement('li'); const playerInfoDiv = document.createElement('div'); const statusDiv = document.createElement('div'); const nameSpan = document.createElement('span'); nameSpan.className = 'player-name'; let content = player.name; if (player.isHost) content += ' 👑 (Host)'; if (player.playerId === myPersistentPlayerId) content += ' (You)'; nameSpan.textContent = content; playerInfoDiv.appendChild(nameSpan); const readyStatusSpan = document.createElement('span'); readyStatusSpan.className = 'ready-status'; readyStatusSpan.innerHTML = player.isReady ? '✅ Ready' : '❌ Not Ready'; statusDiv.appendChild(readyStatusSpan); if (amIHost && player.playerId !== myPersistentPlayerId) { const kickBtn = document.createElement('button'); kickBtn.className = 'kick-btn'; kickBtn.textContent = 'Kick'; kickBtn.dataset.playerId = player.playerId; statusDiv.appendChild(kickBtn); } playerItem.appendChild(playerInfoDiv); playerItem.appendChild(statusDiv); playerList.appendChild(playerItem); }); if (amIHost) { playerLobbyActions.style.display = 'none'; hostLobbyActions.style.display = 'flex'; const activePlayers = currentLobbyPlayers.filter(p => p.active); const allReady = activePlayers.every(p => p.isReady); startGameBtn.disabled = !(activePlayers.length >= 2 && allReady); } else { playerLobbyActions.style.display = 'flex'; hostLobbyActions.style.display = 'none'; readyBtn.disabled = me.isReady; readyBtn.textContent = me.isReady ? 'Ready' : 'Set Ready'; } hostMessage.style.display = amIHost ? 'none' : 'block'; }
+    function renderLobby(currentLobbyPlayers) { /* ... (unchanged) ... */ const me = currentLobbyPlayers.find(p => p.playerId === myPersistentPlayerId); if (!me && sessionStorage.getItem('unoPlayerId')) { showToast("You may have been kicked or the session ended."); sessionStorage.removeItem('unoPlayerId'); sessionStorage.removeItem('unoPlayerName'); myPersistentPlayerId = null; setTimeout(() => { location.reload(); }, 1500); return; } if (!me) { console.error("Could not find player data in lobby."); joinScreen.style.display = 'block'; lobbyScreen.style.display = 'none'; gameBoard.style.display = 'none'; return; } joinScreen.style.display = 'none'; lobbyScreen.style.display = 'block'; gameBoard.style.display = 'none'; endOfRoundDiv.style.display = 'none'; finalScoreModal.style.display = 'none'; if (gameLogList) gameLogList.innerHTML = ''; playerList.innerHTML = ''; let amIHost = me.isHost; currentLobbyPlayers.forEach(player => { if (!player.active) return; const playerItem = document.createElement('li'); const playerInfoDiv = document.createElement('div'); const statusDiv = document.createElement('div'); const nameSpan = document.createElement('span'); nameSpan.className = 'player-name'; let content = player.name; if (player.isHost) content += ' 👑 (Host)'; if (player.playerId === myPersistentPlayerId) content += ' (You)'; nameSpan.textContent = content; playerInfoDiv.appendChild(nameSpan); const readyStatusSpan = document.createElement('span'); readyStatusSpan.className = 'ready-status'; readyStatusSpan.innerHTML = player.isReady ? '✅ Ready' : '❌ Not Ready'; statusDiv.appendChild(readyStatusSpan); if (amIHost && player.playerId !== myPersistentPlayerId) { const kickBtn = document.createElement('button'); kickBtn.className = 'kick-btn'; kickBtn.textContent = 'Kick'; kickBtn.dataset.playerId = player.playerId; statusDiv.appendChild(kickBtn); } playerItem.appendChild(playerInfoDiv); playerItem.appendChild(statusDiv); playerList.appendChild(playerItem); }); if (amIHost) { playerLobbyActions.style.display = 'none'; hostLobbyActions.style.display = 'flex'; const activePlayers = currentLobbyPlayers.filter(p => p.active); const readyPlayers = activePlayers.filter(p => p.isReady); startGameBtn.disabled = !(readyPlayers.length >= 2); } else { playerLobbyActions.style.display = 'flex'; hostLobbyActions.style.display = 'none'; readyBtn.disabled = me.isReady; readyBtn.textContent = me.isReady ? 'Ready' : 'Set Ready'; } hostMessage.style.display = amIHost ? 'none' : 'block'; }
     function showToast(message) { /* ... (unchanged) ... */ if (!toastNotification) return; toastNotification.textContent = message; toastNotification.classList.add('show'); setTimeout(() => { toastNotification.classList.remove('show'); }, 3000); }
     function showUnoAnnouncement(message) { /* ... (unchanged) ... */ unoAnnouncementText.textContent = message; if (message.length > 10) { unoAnnouncementText.style.fontSize = '8vw'; } else { unoAnnouncementText.style.fontSize = '15vw'; } unoAnnouncementOverlay.classList.add('show'); setTimeout(() => { unoAnnouncementOverlay.classList.remove('show'); }, 1900); }
     function isClientMoveValid(playedCard, gameState) { /* ... (unchanged) ... */ if (!gameState || !gameState.discardPile || gameState.discardPile.length === 0) return false; const topDiscard = gameState.discardPile[0]; if (!topDiscard || !topDiscard.card) return false; const topCard = topDiscard.card; const activeColor = gameState.activeColor; const drawPenalty = gameState.drawPenalty; if (drawPenalty > 0) { return playedCard.value === topCard.value; } if (playedCard.color === 'Black') return true; if (playedCard.color === activeColor || playedCard.value === topCard.value) return true; return false; }

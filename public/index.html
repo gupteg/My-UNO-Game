@@ -47,8 +47,10 @@
             <div class="action-buttons">
                 <button id="drawCardBtn">DRAW CARD</button>
                 <button id="unoBtn">UNO</button>
-                <button id="arrangeHandBtn">Arrange My Hand</button>
-                <button id="showDiscardPileBtn">DISCARD PILE</button>
+                <div class="side-by-side-buttons">
+                    <button id="arrangeHandBtn">Arrange My Hand</button>
+                    <button id="showDiscardPileBtn">DISCARD PILE</button>
+                </div>
                 <button id="endGameBtn" style="display: none;">END GAME</button>
             </div>
             <div id="game-log-container">
@@ -61,11 +63,11 @@
     <div id="uno-announcement-overlay"><div id="uno-announcement-text">UNO!</div></div>
     <div id="end-of-round-div" class="modal" style="display: none;"><div class="modal-content"><h2 id="winner-message"></h2><div id="scores-display"></div><div class="modal-buttons-container" id="host-round-end-controls" style="display: none;"><button id="next-round-btn">Start Next Round</button><button id="end-game-round-btn">End Game</button></div><button id="next-round-ok-btn" style="display: none;">OK</button></div></div>
     <div id="color-picker-modal" class="modal" style="display: none;"><div class="modal-content"><h3>Choose the next color:</h3><div class="color-options"><button class="color-btn" data-color="Red"></button><button class="color-btn" data-color="Green"></button><button class="color-btn" data-color="Blue"></button><button class="color-btn" data-color="Yellow"></button></div></div></div>
-    <div id="pick-until-modal" class="modal" style="display: none;"><div class="modal-content"><h3>Choose an action for Wild Pick Until:</h3><div class="action-options"><button id="option-pick-color">Next player picks until color</button><button id="option-discard-wilds">All players discard Wilds</button></div></div></div>
+    <div id="pick-until-modal" class="modal" style="display: none;"><div class="modal-content wide-options"><h3>Choose an action for Wild Pick Until:</h3><div class="action-options"><button id="option-pick-color">Next player picks until color</button><button id="option-discard-wilds">All players discard Wilds</button></div></div></div>
     <div id="swap-modal" class="modal" style="display: none;"><div id="swap-modal-content" class="modal-content"><h3>Choose a player to swap hands with:</h3><div id="swap-player-options" class="action-options"></div></div></div>
 
     <div id="drawn-wild-modal" class="modal" style="display: none;">
-        <div class="modal-content">
+        <div class="modal-content wide-options">
             <h3>You drew a playable Wild card!</h3>
             <h4 id="drawn-wild-card-name"></h4>
             <div class="action-options">

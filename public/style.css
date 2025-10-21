@@ -90,19 +90,53 @@ body {
 .piles-container { display: flex; justify-content: center; align-items: center; gap: 30px; text-align: center; position: relative; }
 #discard-pile-dropzone { border: 3px dashed transparent; padding: 5px; border-radius: 12px; transition: all 0.3s ease; }
 #discard-pile-dropzone.over { border-color: #ffc107; background-color: rgba(255, 193, 7, 0.2); }
-.action-buttons { display: flex; flex-direction: column; align-items: center; gap: 15px; width: 100%; }
-.action-buttons button { padding: 12px 24px; font-size: 18px; cursor: pointer; border-radius: 8px; border: 2px solid #333; width: 100%; }
-#arrangeHandBtn, #showDiscardPileBtn { background-color: #6c757d; border-color: #5a6268; color: white; }
-#unoBtn { width: 120px; height: 120px; border-radius: 50%; border-color: #333; border-width: 3px; font-weight: bold; font-size: 32px; box-shadow: 0 0 10px rgba(0,0,0,0.5); color: white; text-shadow: 1px 1px 2px black; transition: all 0.3s ease; }
+.action-buttons { display: flex; flex-direction: column; align-items: stretch; /* Change alignment */ gap: 15px; width: 100%; }
+.action-buttons button { padding: 12px 24px; font-size: 18px; cursor: pointer; border-radius: 8px; border: 2px solid #333; width: 100%; /* Default to full width */ }
+
+/* --- *** NEW/MODIFIED: Button Styles *** --- */
+#drawCardBtn {
+    padding-top: 18px; /* Increased top padding */
+    padding-bottom: 18px; /* Increased bottom padding */
+}
+.side-by-side-buttons {
+    display: flex;
+    gap: 10px; /* Space between buttons */
+    width: 100%;
+}
+.side-by-side-buttons button {
+    flex: 1; /* Make buttons share space equally */
+    width: auto; /* Override default width */
+}
+#arrangeHandBtn, #showDiscardPileBtn {
+    background-color: #6c757d;
+    border-color: #5a6268;
+    color: white;
+}
+/* --- *** END Button Styles *** --- */
+
+#unoBtn { width: 120px; height: 120px; border-radius: 50%; border-color: #333; border-width: 3px; font-weight: bold; font-size: 32px; box-shadow: 0 0 10px rgba(0,0,0,0.5); color: white; text-shadow: 1px 1px 2px black; transition: all 0.3s ease; margin: 0 auto; /* Center UNO button if needed */ }
 .modal { position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: flex-start; padding-top: 10vh; pointer-events: none; }
 .modal-content { background-color: rgba(40, 40, 40, 0.95); color: white; border: 2px solid #ffc107; box-shadow: 0 0 30px rgba(255, 193, 7, 0.5); padding: 20px; border-radius: 10px; text-align: center; max-width: 90%; pointer-events: auto; }
 .modal-content h3, .modal-content h2, .modal-content p { cursor: move; user-select: none; }
 .modal-content h2, .modal-content h3 { color: #ffc107; text-shadow: 1px 1px 2px black; }
 .modal-content.wide { max-width: 800px; }
+/* --- *** NEW: Wider Options Modals *** --- */
+.modal-content.wide-options {
+    max-width: 500px; /* Make these modals slightly wider */
+}
 .modal-buttons-container { display: flex; justify-content: center; gap: 20px; margin-top: 20px; }
 .color-options, .action-options { display: flex; gap: 10px; margin-top: 15px; }
 .color-options { justify-content: center; }
 .action-options { flex-direction: column; }
+/* --- *** NEW/MODIFIED: Action Option Button Styling *** --- */
+.action-options button {
+    padding: 15px 25px; /* Increase padding */
+    font-size: 1.1em; /* Slightly larger font */
+    min-width: 250px; /* Ensure minimum width */
+    margin: 5px auto; /* Add vertical margin and center */
+}
+/* --- *** END Modal Styles *** --- */
+
 .color-btn { width: 60px; height: 60px; border: 2px solid #333; border-radius: 5px; cursor: pointer; }
 .color-btn[data-color="Red"] { background-color: #ff5555; } .color-btn[data-color="Green"] { background-color: #55aa55; } .color-btn[data-color="Blue"] { background-color: #5555ff; } .color-btn[data-color="Yellow"] { background-color: #ffaa00; }
 #final-scores { margin: 20px auto; padding: 20px; border: 1px solid #333; background-color: white; max-width: 600px; text-align: center; }
@@ -180,8 +214,21 @@ body {
 #direction-arrow svg { display: block; width: 100%; height: 100%; animation: pulse 2s infinite ease-in-out; }
 #direction-arrow svg path { fill: white; transition: fill 0.3s ease; }
 #direction-arrow.reversed { transform: rotate(180deg); }
-@keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.75; transform: scale(1.05); } }
-@media (max-width: 768px) { body { padding: 5px; padding-bottom: 240px; overflow-y: auto; } #game-board { flex-direction: column; padding-top: 40px; height: auto; } #left-column { flex: 1; padding-right: 0; gap: 8px; overflow-y: visible; } #right-column { flex: none; width: 100%; flex-direction: column; align-items: center; gap: 15px; padding: 5px 0; overflow-y: visible; min-width: 0; overflow-x: visible; } .player-area { width: 100%; box-sizing: border-box; } #piles-area .card { width: 100px; height: 150px; } .action-buttons { position: fixed; bottom: 0; left: 0; flex-direction: row; flex-wrap: wrap; background-color: rgba(0,0,0,0.7); padding: 10px; box-sizing: border-box; gap: 10px; z-index: 50; } #unoBtn { width: 60px; height: 60px; font-size: 20px; order: 2; } .action-buttons button { font-size: 14px; padding: 10px; flex: 1 1 40%; min-width: 100px; } #drawCardBtn { order: 1; } #arrangeHandBtn { order: 3; } #showDiscardPileBtn { order: 4; } #endGameBtn { order: 5; } #game-log-container { width: 100%; padding-bottom: 10px; } .card { width: 60px; height: 90px; font-size: 24px; } .card .number-circle { width: 35px; height: 35px; } .card .action-text { font-size: 14px; } .player-info { font-size: 1em; } .card-container { min-height: 95px; } #toast-notification { padding: 12px 20px; font-size: 1.6em; bottom: 180px; max-width: 90%; white-space: normal; } #direction-arrow { height: 150px; width: 40px; } }
+
+/* --- *** MODIFIED: Pulse Intensity *** --- */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.65; /* Slightly more fade */
+    transform: scale(1.15); /* Increased scale */
+  }
+}
+/* --- *** END MODIFIED *** --- */
+
+@media (max-width: 768px) { body { padding: 5px; padding-bottom: 240px; overflow-y: auto; } #game-board { flex-direction: column; padding-top: 40px; height: auto; } #left-column { flex: 1; padding-right: 0; gap: 8px; overflow-y: visible; } #right-column { flex: none; width: 100%; flex-direction: column; align-items: center; gap: 15px; padding: 5px 0; overflow-y: visible; min-width: 0; overflow-x: visible; } .player-area { width: 100%; box-sizing: border-box; } #piles-area .card { width: 100px; height: 150px; } .action-buttons { position: fixed; bottom: 0; left: 0; flex-direction: row; flex-wrap: wrap; background-color: rgba(0,0,0,0.7); padding: 10px; box-sizing: border-box; gap: 10px; z-index: 50; align-items: center; /* Center items vertically */ } #unoBtn { width: 60px; height: 60px; font-size: 20px; order: 2; flex-grow: 0; flex-shrink: 0; /* Prevent UNO button from growing/shrinking */ } .action-buttons button { font-size: 14px; padding: 10px; flex: 1 1 40%; min-width: 100px; } #drawCardBtn { order: 1; padding-top: 10px; padding-bottom: 10px; /* Reset padding for mobile */ } /* --- *** MODIFIED: Mobile Button Layout *** --- */ .side-by-side-buttons { order: 3; display: contents; /* Make div disappear, children become flex items */ } #arrangeHandBtn { order: 3; } #showDiscardPileBtn { order: 4; } #endGameBtn { order: 5; } /* --- *** END MODIFIED *** --- */ #game-log-container { width: 100%; padding-bottom: 10px; } .card { width: 60px; height: 90px; font-size: 24px; } .card .number-circle { width: 35px; height: 35px; } .card .action-text { font-size: 14px; } .player-info { font-size: 1em; } .card-container { min-height: 95px; } #toast-notification { padding: 12px 20px; font-size: 1.6em; bottom: 180px; max-width: 90%; white-space: normal; } #direction-arrow { height: 150px; width: 40px; } /* --- *** MODIFIED: Action Options on Mobile *** --- */ .action-options button { padding: 12px 20px; font-size: 1em; min-width: 200px; } }
 #discard-wilds-results { display: flex; flex-direction: column; gap: 15px; max-height: 50vh; overflow-y: auto; padding: 10px; background-color: rgba(0,0,0,0.2); border-radius: 5px; text-align: left; }
 .discard-result-player { border-bottom: 1px solid #555; padding-bottom: 10px; }
 .discard-result-player:last-child { border-bottom: none; }
@@ -199,9 +246,8 @@ body {
 .firework-particle { position: fixed; width: 6px; height: 6px; border-radius: 50%; z-index: 9998; pointer-events: none; animation: firework-particle-fade 1s ease-out forwards; }
 @keyframes firework-particle-fade { 0% { opacity: 1; transform: translate(0, 0); } 100% { opacity: 0; transform: translate(var(--vx), calc(var(--vy) + 30px)); } }
 
-/* --- *** NEW: Style for wait message *** --- */
 #lobby-wait-message {
-    color: #ccc; /* Lighter text color */
+    color: #ccc;
     font-size: 0.9em;
 }
 /* --- END --- */
