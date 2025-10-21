@@ -180,7 +180,139 @@ io.on('connection', (socket) => {
   socket.on('hardReset', () => { const host = (gameState ? gameState.players.find(p => p.socketId === socket.id && p.isHost) : null) || players.find(p => p.socketId === socket.id && p.isHost); if (host) { console.log(`Host ${host.name} initiated HARD RESET.`); const currentPlayers = gameState ? gameState.players : players; currentPlayers.forEach(p => { if (p.socketId !== host.socketId) { io.to(p.socketId).emit('forceDisconnect'); } }); gameState = null; Object.keys(reconnectTimers).forEach(key => clearTimeout(reconnectTimers[key])); reconnectTimers = {}; if (gameOverToLobbyTimer) clearTimeout(gameOverToLobbyTimer); gameOverToLobbyTimer = null; if (scoresToLobbyTimer) clearTimeout(scoresToLobbyTimer); scoresToLobbyTimer = null; if (globalPauseTimeout) clearTimeout(globalPauseTimeout); globalPauseTimeout = null; const hostData = currentPlayers.find(p => p.playerId === host.playerId); players = [{ playerId: hostData.playerId, socketId: host.socketId, name: hostData.name, isHost: true, isReady: true, active: true }]; io.emit('lobbyUpdate', players); } });
   socket.on('playCard', ({ cardIndex }) => { if (!gameState || gameState.phase !== 'Playing' || gameState.isPaused) return; const playerIndex = gameState.players.findIndex(p => p.socketId === socket.id); if (playerIndex !== -1) { handleCardPlay(playerIndex, cardIndex); if (gameState && gameState.phase !== 'RoundOver' && gameState.phase !== 'GameOver') { io.emit('updateGameState', gameState); } } });
   socket.on('callUno', () => { if (!gameState || gameState.phase !== 'Playing' || gameState.isPaused) return; const player = gameState.players.find(p => p.socketId === socket.id); if (player && player.hand.length === 2 && gameState.players[gameState.currentPlayerIndex].playerId === player.playerId) { player.unoState = 'declared'; addLog(`📣 ${player.name} is ready to call UNO!`); io.emit('updateGameState', gameState); } });
-  socket.on('drawCard', () => { if (!gameState || !['Playing'].includes(gameState.phase) || gameState.isPaused) return; const playerIndex = gameState.players.findIndex(p => p.socketId === socket.id); if (playerIndex === gameState.currentPlayerIndex) { const player = gameState.players[playerIndex]; const topCard = gameState.discardPile[0].card; if (gameState.pickUntilState?.active && gameState.pickUntilState.targetPlayerIndex === playerIndex) { if (gameState.drawPile.length > 0) { const drawnCard = gameState.drawPile.shift(); player.hand.push(drawnCard); io.emit('animateDraw', { playerId: player.playerId, count: 1 }); addLog(`› ${player.name} is picking for a ${gameState.pickUntilState.targetColor}...`); if (drawnCard.color === gameState.pickUntilState.targetColor) { player.hand.splice(player.hand.findIndex(c => c === drawnCard), 1); gameState.discardPile.unshift({ card: drawnCard, playerName: player.name }); gameState.activeColor = drawnCard.color; io.to(socket.id).emit('announce', `You drew the target color (${drawnCard.value} ${drawnCard.color}) and it was played for you.`); addLog(`› ${player.name} found and played a ${drawnCard.color} card.`); const pickUntilChooserId = gameState.pickUntilState.chooserPlayerId; gameState.pickUntilState = null; if (player.hand.length === 0) { const heldWinners = gameState.players.filter(p => gameState.winnerOnHold.includes(p.playerId)); handleEndOfRound([player, ...heldWinners]); return; } if (gameState.winnerOnHold.includes(pickUntilChooserId)) { const heldWinners = gameState.players.filter(p => gameState.winnerOnHold.includes(p.playerId)); handleEndOfRound(heldWinners); return; } applyCardEffect(drawnCard); const numActivePlayers = gameState.players.filter(p => p.status === 'Active').length; if (drawnCard.value === 'Skip' || (drawnCard.value === 'Reverse' && numActivePlayers === 2)) { advanceTurn(); } advanceTurn(); gameState.phase = 'Playing'; } else { player.unoState = 'safe'; } } else { addLog(`Draw pile empty! ${player.name} couldn't find the color.`); gameState.pickUntilState = null; advanceTurn(); gameState.phase = 'Playing'; } } else if (gameState.drawPenalty > 0) { const penalty = gameState.drawPenalty; for (let i = 0; i < penalty; i++) { if (gameState.drawPile.length > 0) player.hand.push(gameState.drawPile.shift()); } io.emit('animateDraw', { playerId: player.playerId, count: penalty }); addLog(`› ${player.name} drew ${penalty} cards.`); player.unoState = 'safe'; gameState.drawPenalty = 0; if (gameState.winnerOnHold.length > 0) { const heldWinners = gameState.players.filter(p => gameState.winnerOnHold.includes(p.playerId)); if (!heldWinners.some(w => w.playerId === player.playerId)) { handleEndOfRound(heldWinners); return; } else { gameState.winnerOnHold = []; } } advanceTurn(); gameState.phase = 'Playing'; } else { if (checkIfPlayerMustPlay(player, topCard, gameState.activeColor)) { io.to(socket.id).emit('announce', 'You have a playable card in your hand. You must play it.'); return; } if (gameState.drawPile.length > 0) { const drawnCard = gameState.drawPile.shift(); io.emit('animateDraw', { playerId: player.playerId, count: 1 }); addLog(`› ${player.name} drew a card.`); if (isMoveValid(drawnCard, topCard, gameState.activeColor, 0)) { if (drawnCard.color === 'Black') { player.hand.push(drawnCard); const cardIndex = player.hand.length - 1; io.to(socket.id).emit('updateGameState', gameState); io.to(socket.id).emit('drawnWildCard', { cardIndex, drawnCard }); return; } else { gameState.discardPile.unshift({ card: drawnCard, playerName: player.name }); gameState.activeColor = drawnCard.color; applyCardEffect(drawnCard); io.to(socket.id).emit('announce', `You drew a playable card (${drawnCard.value} ${drawnCard.color}) and it was played for you.`); addLog(`...and it was a playable ${drawnCard.color} ${drawnCard.value}!`); player.unoState = 'safe'; const numActivePlayers = gameState.players.filter(p => p.status === 'Active').length; if (drawnCard.value === 'Skip' || (drawnCard.value === 'Reverse' && numActivePlayers === 2)) { advanceTurn(); } advanceTurn(); gameState.phase = 'Playing'; } } else { player.hand.push(drawnCard); player.unoState = 'safe'; advanceTurn(); gameState.phase = 'Playing'; } } else { addLog(`Draw pile is empty! ${player.name} passes their turn.`); advanceTurn(); gameState.phase = 'Playing'; } } if (gameState && gameState.phase !== 'GameOver' && gameState.phase !== 'RoundOver' ) { io.emit('updateGameState', gameState); } } });
+  
+  // --- *** MODIFIED: Fixed draw penalty vs pick until bug *** ---
+  socket.on('drawCard', () => {
+    if (!gameState || !['Playing'].includes(gameState.phase) || gameState.isPaused) return;
+    const playerIndex = gameState.players.findIndex(p => p.socketId === socket.id);
+    if (playerIndex === gameState.currentPlayerIndex) {
+        const player = gameState.players[playerIndex];
+        const topCard = gameState.discardPile[0].card;
+
+        // 1. Check for drawPenalty FIRST, as it takes precedence.
+        if (gameState.drawPenalty > 0) {
+            const penalty = gameState.drawPenalty;
+            for (let i = 0; i < penalty; i++) {
+                if (gameState.drawPile.length > 0) player.hand.push(gameState.drawPile.shift());
+            }
+            io.emit('animateDraw', { playerId: player.playerId, count: penalty });
+            addLog(`› ${player.name} drew ${penalty} cards.`);
+            player.unoState = 'safe';
+            gameState.drawPenalty = 0;
+
+            // 2. ALSO clear any lingering pickUntilState for this player.
+            // This is the key fix to prevent the old state from persisting.
+            if (gameState.pickUntilState?.active && gameState.pickUntilState.targetPlayerIndex === playerIndex) {
+                addLog(`...and the 'Pick Until ${gameState.pickUntilState.targetColor}' action was cancelled.`);
+                gameState.pickUntilState = null;
+            }
+
+            if (gameState.winnerOnHold.length > 0) {
+                const heldWinners = gameState.players.filter(p => gameState.winnerOnHold.includes(p.playerId));
+                if (!heldWinners.some(w => w.playerId === player.playerId)) {
+                    handleEndOfRound(heldWinners);
+                    return;
+                } else {
+                    gameState.winnerOnHold = [];
+                }
+            }
+            advanceTurn();
+            gameState.phase = 'Playing';
+
+        // 3. Check for pickUntilState SECOND (now as 'else if').
+        } else if (gameState.pickUntilState?.active && gameState.pickUntilState.targetPlayerIndex === playerIndex) {
+            if (gameState.drawPile.length > 0) {
+                const drawnCard = gameState.drawPile.shift();
+                player.hand.push(drawnCard);
+                io.emit('animateDraw', { playerId: player.playerId, count: 1 });
+                addLog(`› ${player.name} is picking for a ${gameState.pickUntilState.targetColor}...`);
+                if (drawnCard.color === gameState.pickUntilState.targetColor) {
+                    player.hand.splice(player.hand.findIndex(c => c === drawnCard), 1);
+                    gameState.discardPile.unshift({ card: drawnCard, playerName: player.name });
+                    gameState.activeColor = drawnCard.color;
+                    io.to(socket.id).emit('announce', `You drew the target color (${drawnCard.value} ${drawnCard.color}) and it was played for you.`);
+                    addLog(`› ${player.name} found and played a ${drawnCard.color} card.`);
+                    const pickUntilChooserId = gameState.pickUntilState.chooserPlayerId;
+                    gameState.pickUntilState = null; // State is resolved
+                    if (player.hand.length === 0) {
+                        const heldWinners = gameState.players.filter(p => gameState.winnerOnHold.includes(p.playerId));
+                        handleEndOfRound([player, ...heldWinners]);
+                        return;
+                    }
+                    if (gameState.winnerOnHold.includes(pickUntilChooserId)) {
+                        const heldWinners = gameState.players.filter(p => gameState.winnerOnHold.includes(p.playerId));
+                        handleEndOfRound(heldWinners);
+                        return;
+                    }
+                    applyCardEffect(drawnCard);
+                    const numActivePlayers = gameState.players.filter(p => p.status === 'Active').length;
+                    if (drawnCard.value === 'Skip' || (drawnCard.value === 'Reverse' && numActivePlayers === 2)) {
+                        advanceTurn();
+                    }
+                    advanceTurn();
+                    gameState.phase = 'Playing';
+                } else {
+                    player.unoState = 'safe';
+                }
+            } else {
+                addLog(`Draw pile empty! ${player.name} couldn't find the color.`);
+                gameState.pickUntilState = null; // State is resolved
+                advanceTurn();
+                gameState.phase = 'Playing';
+            }
+        
+        // 4. This is the original 'else' block for a normal draw.
+        } else {
+            if (checkIfPlayerMustPlay(player, topCard, gameState.activeColor)) {
+                io.to(socket.id).emit('announce', 'You have a playable card in your hand. You must play it.');
+                return;
+            }
+            if (gameState.drawPile.length > 0) {
+                const drawnCard = gameState.drawPile.shift();
+                io.emit('animateDraw', { playerId: player.playerId, count: 1 });
+                addLog(`› ${player.name} drew a card.`);
+                if (isMoveValid(drawnCard, topCard, gameState.activeColor, 0)) {
+                    if (drawnCard.color === 'Black') {
+                        player.hand.push(drawnCard);
+                        const cardIndex = player.hand.length - 1;
+                        io.to(socket.id).emit('updateGameState', gameState);
+                        io.to(socket.id).emit('drawnWildCard', { cardIndex, drawnCard });
+                        return; // Wait for player to choose 'play' or 'keep'
+                    } else {
+                        gameState.discardPile.unshift({ card: drawnCard, playerName: player.name });
+                        gameState.activeColor = drawnCard.color;
+                        applyCardEffect(drawnCard);
+                        io.to(socket.id).emit('announce', `You drew a playable card (${drawnCard.value} ${drawnCard.color}) and it was played for you.`);
+                        addLog(`...and it was a playable ${drawnCard.color} ${drawnCard.value}!`);
+                        player.unoState = 'safe';
+                        const numActivePlayers = gameState.players.filter(p => p.status === 'Active').length;
+                        if (drawnCard.value === 'Skip' || (drawnCard.value === 'Reverse' && numActivePlayers === 2)) {
+                            advanceTurn();
+                        }
+                        advanceTurn();
+                        gameState.phase = 'Playing';
+                    }
+                } else {
+                    player.hand.push(drawnCard);
+                    player.unoState = 'safe';
+                    advanceTurn();
+                    gameState.phase = 'Playing';
+                }
+            } else {
+                addLog(`Draw pile is empty! ${player.name} passes their turn.`);
+                advanceTurn();
+                gameState.phase = 'Playing';
+            }
+        }
+        
+        // Send the final state update
+        if (gameState && gameState.phase !== 'GameOver' && gameState.phase !== 'RoundOver' ) {
+            io.emit('updateGameState', gameState);
+        }
+    }
+  });
+  // --- *** END MODIFICATION *** ---
+
   socket.on('choosePlayDrawnWild', ({ play, cardIndex }) => { if (!gameState || !['Playing'].includes(gameState.phase) || gameState.isPaused) return; const playerIndex = gameState.players.findIndex(p => p.socketId === socket.id); const player = gameState.players[playerIndex]; if (!player || playerIndex !== gameState.currentPlayerIndex) return; if (play) { if (cardIndex !== player.hand.length - 1) { console.error("Drawn wild card index mismatch!"); return; } if (player.hand.length === 2) { player.unoState = 'declared'; } gameState.phase = 'Playing'; handleCardPlay(playerIndex, cardIndex); } else { addLog(`› ${player.name} chose to keep the drawn Wild card.`); advanceTurn(); gameState.phase = 'Playing'; } if (gameState && gameState.phase !== 'RoundOver' && gameState.phase !== 'GameOver') { io.emit('updateGameState', gameState); } });
   socket.on('pickUntilChoice', ({ choice }) => { if (!gameState || gameState.phase !== 'ChoosingPickUntilAction' || gameState.isPaused) return; const player = gameState.players.find(p => p.socketId === socket.id); if (gameState.playerChoosingActionId !== player?.playerId) return; const numPlayers = gameState.players.length; const originalPlayerIndex = gameState.players.findIndex(p => p.socketId === socket.id); if (choice === 'discard-wilds') { const msg = `🌪️ ${player.name} chose 'All players discard Wilds'!`; addLog(msg); io.emit('announce', msg); const winners = []; const allDiscardedData = []; gameState.players.forEach(p => { if (p.socketId !== socket.id && p.status === 'Active') { const originalHandSize = p.hand.length; if (originalHandSize > 0) { const discardedCards = p.hand.filter(card => card.color === 'Black'); if (discardedCards.length > 0) allDiscardedData.push({ playerName: p.name, cards: discardedCards }); p.hand = p.hand.filter(card => card.color !== 'Black'); if (p.hand.length === 0) winners.push(p); else if (p.hand.length === 1 && originalHandSize > 1) { p.unoState = 'declared'; io.emit('unoCalled', { playerName: p.name }); } } } }); io.emit('showDiscardWildsModal', allDiscardedData); if (allDiscardedData.length === 0) addLog('...but no other players had any Wild cards.'); if (winners.length > 0) { const heldWinners = gameState.players.filter(p => gameState.winnerOnHold.includes(p.playerId)); handleEndOfRound([...winners, ...heldWinners]); return; } if (gameState.winnerOnHold.includes(player.playerId)) { const heldWinners = gameState.players.filter(p => gameState.winnerOnHold.includes(p.playerId)); handleEndOfRound(heldWinners); return; } gameState.phase = 'ChoosingColor'; } else if (choice === 'pick-color') { const msg = `🎨 ${player.name} chose 'Next player picks until color'.`; addLog(msg); io.emit('announce', msg); let nextPlayerIndex = -1; let searchIndex = originalPlayerIndex; let searchLimit = numPlayers; do { searchIndex = (searchIndex + gameState.playDirection + numPlayers) % numPlayers; if (gameState.players[searchIndex].status === 'Active') { nextPlayerIndex = searchIndex; break; } searchLimit--; } while (searchLimit > 0); if (nextPlayerIndex !== -1 && nextPlayerIndex !== originalPlayerIndex) { gameState.pickUntilState = { chooserPlayerId: player.playerId, targetPlayerIndex: nextPlayerIndex, active: false, targetColor: null }; gameState.phase = 'ChoosingColor'; } else { addLog('No other active players to target. Turn continues after color choice.'); gameState.pickUntilState = null; gameState.phase = 'ChoosingColor'; } } io.emit('updateGameState', gameState); });
   socket.on('swapHandsChoice', ({ targetPlayerId }) => { if (!gameState || gameState.phase !== 'ChoosingSwapHands' || gameState.isPaused) return; const choosingPlayer = gameState.players.find(p => p.socketId === socket.id); if (gameState.playerChoosingActionId !== choosingPlayer?.playerId) return; const targetPlayer = gameState.players.find(p => p.playerId === targetPlayerId && p.status === 'Active'); if (choosingPlayer && targetPlayer) { io.emit('animateSwap', { p1_id: choosingPlayer.playerId, p2_id: targetPlayer.playerId }); [choosingPlayer.hand, targetPlayer.hand] = [targetPlayer.hand, choosingPlayer.hand]; [choosingPlayer, targetPlayer].forEach(p => { if (p.hand.length === 1) { p.unoState = 'declared'; io.emit('unoCalled', { playerName: p.name }); } else { p.unoState = 'safe'; } }); const msg = `🤝 ${choosingPlayer.name} swapped hands with ${targetPlayer.name}!`; addLog(msg); io.emit('announce', msg); gameState.playerChoosingActionId = null; gameState.swapState = null; advanceTurn(); gameState.phase = 'Playing'; } else { addLog(`Target player ${targetPlayerId} not found or not active.`); gameState.phase = 'Playing'; advanceTurn(); } io.emit('updateGameState', gameState); });
