@@ -207,6 +207,13 @@ window.addEventListener('DOMContentLoaded', () => {
     socket.on('announce', (message) => { showToast(message); });
     socket.on('youWereMarkedAFK', () => { afkNotificationModal.style.display = 'flex'; });
     socket.on('unoCalled', ({ playerName }) => { showUnoAnnouncement(`${playerName} says UNO!`); });
+
+    // --- *** B. MODIFIED: Added listener for successful UNO call *** ---
+    socket.on('unoCallSuccessful', () => {
+        showToast('You are ready to say UNO!');
+    });
+    // --- *** END B *** ---
+
     socket.on('showDiscardWildsModal', (allDiscardedData) => { discardWildsResults.innerHTML = ''; if (allDiscardedData.length === 0) { discardWildsResults.innerHTML = '<h3 class="discard-wilds-empty-msg">...but no other players had any Wild cards!</h3>'; } else { allDiscardedData.forEach(playerData => { const playerGroup = document.createElement('div'); playerGroup.className = 'discard-result-player'; const playerName = document.createElement('p'); playerName.className = 'discard-result-player-name'; playerName.textContent = `${playerData.playerName} discarded:`; playerGroup.appendChild(playerName); const cardContainer = document.createElement('div'); cardContainer.className = 'discard-result-cards'; if (playerData.cards.length === 0) { const noCardsMsg = document.createElement('span'); noCardsMsg.textContent = '(No cards)'; cardContainer.appendChild(noCardsMsg); } else { playerData.cards.forEach(card => { const cardEl = createCardElement(card, -1); cardContainer.appendChild(cardEl); }); } playerGroup.appendChild(cardContainer); discardWildsResults.appendChild(playerGroup); }); } discardWildsModal.style.display = 'flex'; });
     socket.on('animateDraw', ({ playerId, count }) => { animateCardDraw(playerId, count); });
     socket.on('animateSwap', ({ p1_id, p2_id }) => { animateHandSwap(p1_id, p2_id); });
