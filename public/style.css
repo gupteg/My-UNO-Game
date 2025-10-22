@@ -90,8 +90,54 @@ body {
 .piles-container { display: flex; justify-content: center; align-items: center; gap: 30px; text-align: center; position: relative; }
 #discard-pile-dropzone { border: 3px dashed transparent; padding: 5px; border-radius: 12px; transition: all 0.3s ease; }
 #discard-pile-dropzone.over { border-color: #ffc107; background-color: rgba(255, 193, 7, 0.2); }
-.action-buttons { display: flex; flex-direction: column; align-items: center; gap: 15px; width: 100%; }
-.action-buttons button { padding: 12px 24px; font-size: 18px; cursor: pointer; border-radius: 8px; border: 2px solid #333; width: 100%; }
+
+/* --- *** A. MODIFIED: Action Buttons Layout (Desktop) *** --- */
+.action-buttons {
+  display: flex;
+  flex-wrap: wrap; /* Allow wrapping */
+  flex-direction: row; /* Use row layout */
+  justify-content: center; /* Center buttons horizontally */
+  align-items: stretch; /* Make buttons in same row equal height */
+  gap: 15px;
+  width: 100%;
+}
+
+.action-buttons button {
+  padding: 12px 24px;
+  font-size: 18px;
+  cursor: pointer;
+  border-radius: 8px;
+  border: 2px solid #333;
+  /* width: 100%; */ /* REMOVED - let flexbox handle width */
+  flex-grow: 1; /* Allow buttons to grow */
+  flex-shrink: 1; /* Allow buttons to shrink */
+  flex-basis: auto; /* Default basis */
+}
+
+#drawCardBtn {
+  flex-basis: 100%; /* Make this button full-width */
+  padding-top: 24px; /* ~2x height */
+  padding-bottom: 24px;
+  font-size: 22px; /* Bigger font */
+}
+
+#unoBtn {
+  flex-basis: 100%; /* Make this button full-width */
+}
+
+#arrangeHandBtn, #showDiscardPileBtn {
+  flex-basis: 40%; /* Side-by-side, each ~40% width */
+  padding-top: 18px; /* ~1.5x height */
+  padding-bottom: 18px;
+  font-size: 16px;
+}
+
+#endGameBtn {
+  flex-basis: 100%; /* Make this button full-width */
+}
+/* --- *** END A *** --- */
+
+
 #arrangeHandBtn, #showDiscardPileBtn { background-color: #6c757d; border-color: #5a6268; color: white; }
 #unoBtn { width: 120px; height: 120px; border-radius: 50%; border-color: #333; border-width: 3px; font-weight: bold; font-size: 32px; box-shadow: 0 0 10px rgba(0,0,0,0.5); color: white; text-shadow: 1px 1px 2px black; transition: all 0.3s ease; }
 .modal { position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: flex-start; padding-top: 10vh; pointer-events: none; }
@@ -180,8 +226,59 @@ body {
 #direction-arrow svg { display: block; width: 100%; height: 100%; animation: pulse 2s infinite ease-in-out; }
 #direction-arrow svg path { fill: white; transition: fill 0.3s ease; }
 #direction-arrow.reversed { transform: rotate(180deg); }
-@keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.75; transform: scale(1.05); } }
-@media (max-width: 768px) { body { padding: 5px; padding-bottom: 240px; overflow-y: auto; } #game-board { flex-direction: column; padding-top: 40px; height: auto; } #left-column { flex: 1; padding-right: 0; gap: 8px; overflow-y: visible; } #right-column { flex: none; width: 100%; flex-direction: column; align-items: center; gap: 15px; padding: 5px 0; overflow-y: visible; min-width: 0; overflow-x: visible; } .player-area { width: 100%; box-sizing: border-box; } #piles-area .card { width: 100px; height: 150px; } .action-buttons { position: fixed; bottom: 0; left: 0; flex-direction: row; flex-wrap: wrap; background-color: rgba(0,0,0,0.7); padding: 10px; box-sizing: border-box; gap: 10px; z-index: 50; } #unoBtn { width: 60px; height: 60px; font-size: 20px; order: 2; } .action-buttons button { font-size: 14px; padding: 10px; flex: 1 1 40%; min-width: 100px; } #drawCardBtn { order: 1; } #arrangeHandBtn { order: 3; } #showDiscardPileBtn { order: 4; } #endGameBtn { order: 5; } #game-log-container { width: 100%; padding-bottom: 10px; } .card { width: 60px; height: 90px; font-size: 24px; } .card .number-circle { width: 35px; height: 35px; } .card .action-text { font-size: 14px; } .player-info { font-size: 1em; } .card-container { min-height: 95px; } #toast-notification { padding: 12px 20px; font-size: 1.6em; bottom: 180px; max-width: 90%; white-space: normal; } #direction-arrow { height: 150px; width: 40px; } }
+
+/* --- *** B. MODIFIED: Increased Pulse Intensity *** --- */
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.15); } /* More intense pulse */
+}
+/* --- *** END B *** --- */
+
+@media (max-width: 768px) { body { padding: 5px; padding-bottom: 240px; overflow-y: auto; } #game-board { flex-direction: column; padding-top: 40px; height: auto; } #left-column { flex: 1; padding-right: 0; gap: 8px; overflow-y: visible; } #right-column { flex: none; width: 100%; flex-direction: column; align-items: center; gap: 15px; padding: 5px 0; overflow-y: visible; min-width: 0; overflow-x: visible; } .player-area { width: 100%; box-sizing: border-box; } #piles-area .card { width: 100px; height: 150px; } 
+  
+  /* --- *** A. MODIFIED: Mobile Action Buttons Layout *** --- */
+  .action-buttons { position: fixed; bottom: 0; left: 0; flex-direction: row; flex-wrap: wrap; background-color: rgba(0,0,0,0.7); padding: 10px; box-sizing: border-box; gap: 10px; z-index: 50; }
+  
+  .action-buttons button {
+    font-size: 14px;
+    padding: 10px; /* Base padding */
+    flex: 1 1 40%; /* Base flex rule */
+    min-width: 100px;
+  }
+  
+  #drawCardBtn {
+    order: 1;
+    padding-top: 20px; /* ~2x height */
+    padding-bottom: 20px;
+    font-size: 16px; /* Bigger font */
+  }
+  
+  #unoBtn {
+    width: 60px;
+    height: 60px;
+    font-size: 20px;
+    order: 2;
+    flex: none; /* Do not stretch this button */
+  }
+  
+  #arrangeHandBtn {
+    order: 3;
+    padding-top: 15px; /* ~1.5x height */
+    padding-bottom: 15px;
+  }
+  
+  #showDiscardPileBtn {
+    order: 4;
+    padding-top: 15px; /* ~1.5x height */
+    padding-bottom: 15px;
+  }
+  
+  #endGameBtn {
+    order: 5;
+  }
+  /* --- *** END A *** --- */
+  
+  #game-log-container { width: 100%; padding-bottom: 10px; } .card { width: 60px; height: 90px; font-size: 24px; } .card .number-circle { width: 35px; height: 35px; } .card .action-text { font-size: 14px; } .player-info { font-size: 1em; } .card-container { min-height: 95px; } #toast-notification { padding: 12px 20px; font-size: 1.6em; bottom: 180px; max-width: 90%; white-space: normal; } #direction-arrow { height: 150px; width: 40px; } }
 #discard-wilds-results { display: flex; flex-direction: column; gap: 15px; max-height: 50vh; overflow-y: auto; padding: 10px; background-color: rgba(0,0,0,0.2); border-radius: 5px; text-align: left; }
 .discard-result-player { border-bottom: 1px solid #555; padding-bottom: 10px; }
 .discard-result-player:last-child { border-bottom: none; }
@@ -205,3 +302,40 @@ body {
     font-size: 0.9em;
 }
 /* --- END --- */
+
+/* --- *** C. MODIFIED: Increase Modal Size/Spacing for Action Modals *** --- */
+#pick-until-modal .modal-content,
+#swap-modal .modal-content,
+#drawn-wild-modal .modal-content {
+  max-width: 550px; /* Increase max-width from default */
+  padding: 30px; /* Increase padding */
+}
+
+.action-options {
+  gap: 20px; /* Increase gap between buttons */
+  margin-top: 25px; /* Increase space below header */
+}
+
+/* Target buttons inside these specific modals */
+.action-options button {
+  font-size: 1.2em; /* Bigger button text */
+  padding: 15px 30px; /* Taller/wider buttons */
+  font-weight: bold;
+  color: #333;
+  border: 2px solid #ccc;
+  background-color: #f0f0f0;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border-radius: 8px; /* Ensure buttons have rounded corners */
+}
+
+.action-options button:hover:not(:disabled) {
+  transform: scale(1.05);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+}
+
+/* Specific text in drawn-wild-modal */
+#drawn-wild-card-name {
+  font-size: 1.6em; /* Make this text bigger too */
+}
+/* --- *** END C *** --- */
