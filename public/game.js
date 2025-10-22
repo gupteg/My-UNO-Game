@@ -231,7 +231,140 @@ window.addEventListener('DOMContentLoaded', () => {
     function getActionBarText(gameState, currentPlayer, playerChoosingAction) { /* ... (unchanged) ... */ if (gameState.isPaused && gameState.pauseInfo?.pauseEndTime) { const { pauseEndTime, pausedForPlayerNames } = gameState.pauseInfo; const names = pausedForPlayerNames.join(', '); const updateTimer = () => { const remaining = Math.max(0, Math.floor((pauseEndTime - Date.now()) / 1000)); actionBar.textContent = `Waiting ${remaining}s for ${names} to rejoin...`; if (!countdownInterval && remaining > 0) { countdownInterval = setInterval(updateTimer, 1000); } else if (remaining <= 0 && countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; } }; updateTimer(); return actionBar.textContent; } if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; } switch(gameState.phase) { case 'Lobby': return "Waiting for players..."; case 'Dealing': return playerChoosingAction ? `Waiting for ${playerChoosingAction.name} (Dealer) to deal...` : 'Waiting for dealer...'; case 'Playing': if (gameState.pickUntilState?.active && gameState.pickUntilState.targetPlayerIndex === gameState.currentPlayerIndex) { return `${currentPlayer.name} must pick until they find a ${gameState.pickUntilState.targetColor}!`; } else if (gameState.drawPenalty > 0 && gameState.currentPlayerIndex === gameState.players.findIndex(p => p.playerId === currentPlayer?.playerId)) { return `${currentPlayer.name} must draw ${gameState.drawPenalty}!`; } return currentPlayer ? `Waiting for ${currentPlayer.name} to play...` : 'Waiting for player...'; case 'ChoosingColor': return playerChoosingAction ? `${playerChoosingAction.name} is choosing a color...` : 'Choosing a color...'; case 'ChoosingPickUntilAction': return playerChoosingAction ? `${playerChoosingAction.name} is choosing Wild Pick Until action...` : 'Choosing action...'; case 'ChoosingSwapHands': return playerChoosingAction ? `${playerChoosingAction.name} is choosing who to swap with...` : 'Choosing swap target...'; case 'RoundOver': const host = gameState.players.find(p => p.isHost); const hostIsReady = gameState.readyForNextRound.includes(host?.playerId); const connectedPlayers = gameState.players.filter(p => p.status === 'Active'); const allReady = gameState.readyForNextRound.length === connectedPlayers.length; if (hostIsReady && !allReady) { const waitingOnPlayers = connectedPlayers.filter(p => !gameState.readyForNextRound.includes(p.playerId)); const waitingOnNames = waitingOnPlayers.map(p => p.name).join(', '); return `Waiting for ${waitingOnNames} to click OK...`; } else if (!hostIsReady && allReady) { return `Waiting for ${host?.name} (Host) to start next round...`; } else { return `Round Over! Waiting for players...`; } case 'GameOver': return "Game Over!"; default: "Loading..."; } }
     function updateDirectionArrow(gameState) { /* ... (unchanged) ... */ const currentDirectionArrow = document.getElementById('direction-arrow'); if (!currentDirectionArrow) { console.error("Direction arrow element not found"); return; } currentDirectionArrow.classList.toggle('reversed', gameState.playDirection === -1); const arrowSvgPath = currentDirectionArrow.querySelector('svg path'); if (arrowSvgPath) { const activeColor = gameState.activeColor || 'Black'; const colorMap = { "Red": "#ff5555", "Green": "#55aa55", "Blue": "#5555ff", "Yellow": "#ffaa00", "Black": "#FFFFFF" }; arrowSvgPath.style.fill = colorMap[activeColor] || '#FFFFFF'; } }
     function renderPiles(gameState) { /* ... (unchanged) ... */ const pilesArea = document.getElementById('piles-area'); pilesArea.innerHTML = ''; const pilesContainer = document.createElement('div'); pilesContainer.className = 'piles-container'; const drawPileWrapper = document.createElement('div'); drawPileWrapper.className = 'pile-wrapper'; const drawPileTitle = document.createElement('h4'); drawPileTitle.textContent = 'Draw Pile'; const drawCount = document.createElement('div'); drawCount.className = 'pile-count'; drawCount.textContent = `(${gameState.drawPile.length} Cards)`; const cardBackElement = document.createElement('div'); cardBackElement.className = 'card card-back'; cardBackElement.innerHTML = 'U<br>N<br>O'; drawPileWrapper.appendChild(drawPileTitle); drawPileWrapper.appendChild(drawCount); drawPileWrapper.appendChild(cardBackElement); pilesContainer.appendChild(drawPileWrapper); const arrowElement = document.createElement('div'); arrowElement.id = 'direction-arrow'; arrowElement.innerHTML = ` <svg viewBox="0 0 100 220" preserveAspectRatio="xMidYMid meet" style="width: 100%; height: 100%; filter: drop-shadow(1px 1px 2px black);"> <path d="M50 210 L95 170 L80 170 L80 10 L20 10 L20 170 L5 170 Z" /> </svg> `; pilesContainer.appendChild(arrowElement); const discardPileWrapper = document.createElement('div'); discardPileWrapper.className = 'pile-wrapper'; const discardPileTitle = document.createElement('h4'); discardPileTitle.textContent = 'Discard Pile'; const discardCount = document.createElement('div'); discardCount.className = 'pile-count'; discardCount.textContent = `(${gameState.discardPile.length} Cards)`; const discardPileDiv = document.createElement('div'); discardPileDiv.id = 'discard-pile-dropzone'; const topDiscard = gameState.discardPile[0]; if (topDiscard && topDiscard.card) { const topCardElement = createCardElement(topDiscard.card, -1); discardPileDiv.appendChild(topCardElement); } discardPileWrapper.appendChild(discardPileTitle); discardPileWrapper.appendChild(discardCount); discardPileWrapper.appendChild(discardPileDiv); pilesContainer.appendChild(discardPileWrapper); pilesArea.appendChild(pilesContainer); const dropZone = document.getElementById('discard-pile-dropzone'); if (dropZone) { dropZone.ondragover = (e) => { e.preventDefault(); dropZone.classList.add('over'); }; dropZone.ondragleave = () => { dropZone.classList.remove('over'); }; dropZone.ondrop = (e) => { e.preventDefault(); dropZone.classList.remove('over'); if (draggedCardIndex !== -1) { const myPlayer = window.gameState?.players.find(p => p.playerId === myPersistentPlayerId); const currentPlayer = window.gameState?.players[window.gameState.currentPlayerIndex]; const isMyTurn = myPlayer && currentPlayer && currentPlayer.playerId === myPlayer.playerId; if(window.gameState && isMyTurn && window.gameState.phase === 'Playing' && !window.gameState.isPaused) { const playedCard = myPlayer.hand[draggedCardIndex]; if (isClientMoveValid(playedCard, window.gameState)) { socket.emit('playCard', { cardIndex: draggedCardIndex }); } else { if (draggedCardElement) { triggerInvalidMoveFeedback(draggedCardElement); } } } if (draggedCardElement) draggedCardElement.style.opacity = '1'; draggedCardElement = null; draggedCardIndex = -1; } }; } }
-    function renderPlayers(gameState) { /* ... (unchanged) ... */ const leftColumn = document.getElementById('left-column'); leftColumn.innerHTML = ''; const myPlayer = gameState.players.find(p => p.playerId === myPersistentPlayerId); if (!myPlayer) return; const isHost = myPlayer.isHost; const currentPlayer = gameState.players[gameState.currentPlayerIndex]; gameState.players.forEach((player, playerIndex) => { const playerArea = document.createElement('div'); playerArea.className = 'player-area'; playerArea.dataset.playerId = player.playerId; playerArea.classList.toggle('disconnected', player.status === 'Disconnected'); playerArea.classList.toggle('removed', player.status === 'Removed'); const isCurrentPlayer = currentPlayer?.playerId === player.playerId; const isDealerChoosing = gameState.phase === 'Dealing' && player.playerId === gameState.playerChoosingActionId; playerArea.classList.toggle('active-player', (isCurrentPlayer && player.status === 'Active' && !gameState.isPaused && gameState.phase !== 'RoundOver' && gameState.phase !== 'GameOver') || isDealerChoosing); playerArea.classList.toggle('uno-unsafe', player.unoState === 'unsafe'); playerArea.classList.toggle('uno-declared', player.unoState === 'declared' && player.playerId === myPersistentPlayerId); playerArea.classList.toggle('has-uno', player.hand.length === 1 && gameState.phase !== 'RoundOver' && gameState.phase !== 'GameOver'); const playerInfo = document.createElement('div'); playerInfo.className = 'player-info'; const nameSpan = document.createElement('span'); const hostIndicator = player.isHost ? '👑 ' : ''; nameSpan.innerHTML = `${hostIndicator}${player.name} (${player.hand.length} cards) <span class="player-score">Score: ${player.score}</span>`; playerInfo.appendChild(nameSpan); if (isHost && player.playerId !== myPersistentPlayerId && player.status === 'Active' && gameState.phase !== 'RoundOver' && gameState.phase !== 'GameOver') { const afkBtn = document.createElement('button'); afkBtn.className = 'mark-afk-btn'; afkBtn.textContent = 'Mark AFK'; afkBtn.dataset.playerId = player.playerId; playerInfo.appendChild(afkBtn); } playerArea.appendChild(playerInfo); const cardContainer = document.createElement('div'); cardContainer.className = 'card-container'; if (player.playerId === myPersistentPlayerId) { const currentHand = player.hand; currentHand.forEach((card, indexInHand) => { const originalCardIndex = indexInHand; const cardEl = createCardElement(card, originalCardIndex); const isMyTurn = isCurrentPlayer; const canPlay = isMyTurn && gameState.phase === 'Playing' && !gameState.isPaused && player.status === 'Active'; cardEl.classList.toggle('clickable', canPlay); cardEl.addEventListener('click', () => { if (canPlay) { if (isClientMoveValid(card, gameState)) { socket.emit('playCard', { cardIndex: originalCardIndex }); } else { triggerInvalidMoveFeedback(cardEl); } } }); cardEl.draggable = canPlay; cardContainer.appendChild(cardEl); }); cardContainer.ondragstart = e => { if (!e.target.classList.contains('card') || !e.target.draggable) { e.preventDefault(); return; } draggedCardElement = e.target; draggedCardIndex = parseInt(e.target.dataset.cardIndex); setTimeout(() => e.target.classList.add('dragging'), 0); }; cardContainer.ondragend = e => { if (draggedCardElement) { draggedCardElement.classList.remove('dragging'); draggedCardElement.style.opacity = '1'; const myCurrentPlayerState = window.gameState?.players.find(p => p.playerId === myPersistentPlayerId); if (myCurrentPlayerState) { const newElements = [...cardContainer.querySelectorAll('.card')]; const validElements = newElements.filter(el => el !== draggedCardElement || !el.classList.contains('dragging')); const newIndices = validElements.map(el => parseInt(el.dataset.cardIndex)); const serverHand = myCurrentPlayerState.hand; if (newIndices.length === serverHand.length && newIndices.every(idx => idx >= 0 && idx < serverHand.length)) { const reorderedHand = newIndices.map(originalIndex => serverHand[originalIndex]).filter(Boolean); if (reorderedHand.length === serverHand.length) { socket.emit('rearrangeHand', { newHand: reorderedHand }); myPlayer.hand = reorderedHand; } } else { console.warn("Index mismatch during drag reorder, not sending update."); } } draggedCardElement = null; draggedCardIndex = -1; } }; cardContainer.ondragover = e => { e.preventDefault(); if (!draggedCardElement || window.gameState?.isPaused || window.gameState?.phase !== 'Playing') return; const afterElement = getDragAfterElement(cardContainer, e.clientX); if (afterElement == null) { cardContainer.appendChild(draggedCardElement); } else { cardContainer.insertBefore(draggedCardElement, afterElement); } }; } else { if (gameState.phase === 'RoundOver' && player.status === 'Active') { player.hand.forEach((card, cardIndex) => { const cardEl = createCardElement(card, cardIndex); cardContainer.appendChild(cardEl); }); } else { if (player.hand.length === 1 && gameState.phase !== 'GameOver') { const cardEl = document.createElement('div'); cardEl.className = 'card uno-warning'; const unoSpan = document.createElement('span'); unoSpan.textContent = 'UNO'; cardEl.appendChild(unoSpan); cardContainer.appendChild(cardEl); } else { for (let j = 0; j < player.hand.length; j++) { const cardEl = document.createElement('div'); cardEl.className = 'card card-back'; cardContainer.appendChild(cardEl); } } } } playerArea.appendChild(cardContainer); leftColumn.appendChild(playerArea); }); }
+    function renderPlayers(gameState) {
+        /* ... (unchanged) ... */
+        const leftColumn = document.getElementById('left-column');
+        leftColumn.innerHTML = '';
+        const myPlayer = gameState.players.find(p => p.playerId === myPersistentPlayerId);
+        if (!myPlayer) return;
+        const isHost = myPlayer.isHost;
+        const currentPlayer = gameState.players[gameState.currentPlayerIndex];
+        gameState.players.forEach((player, playerIndex) => {
+            const playerArea = document.createElement('div');
+            playerArea.className = 'player-area';
+            playerArea.dataset.playerId = player.playerId;
+            playerArea.classList.toggle('disconnected', player.status === 'Disconnected');
+            playerArea.classList.toggle('removed', player.status === 'Removed');
+            const isCurrentPlayer = currentPlayer?.playerId === player.playerId;
+            const isDealerChoosing = gameState.phase === 'Dealing' && player.playerId === gameState.playerChoosingActionId;
+            playerArea.classList.toggle('active-player', (isCurrentPlayer && player.status === 'Active' && !gameState.isPaused && gameState.phase !== 'RoundOver' && gameState.phase !== 'GameOver') || isDealerChoosing);
+            playerArea.classList.toggle('uno-unsafe', player.unoState === 'unsafe');
+            playerArea.classList.toggle('uno-declared', player.unoState === 'declared' && player.playerId === myPersistentPlayerId);
+            playerArea.classList.toggle('has-uno', player.hand.length === 1 && gameState.phase !== 'RoundOver' && gameState.phase !== 'GameOver');
+            const playerInfo = document.createElement('div');
+            playerInfo.className = 'player-info';
+            const nameSpan = document.createElement('span');
+            const hostIndicator = player.isHost ? '👑 ' : '';
+            nameSpan.innerHTML = `${hostIndicator}${player.name} (${player.hand.length} cards) <span class="player-score">Score: ${player.score}</span>`;
+            playerInfo.appendChild(nameSpan);
+            if (isHost && player.playerId !== myPersistentPlayerId && player.status === 'Active' && gameState.phase !== 'RoundOver' && gameState.phase !== 'GameOver') {
+                const afkBtn = document.createElement('button');
+                afkBtn.className = 'mark-afk-btn';
+                afkBtn.textContent = 'Mark AFK';
+                afkBtn.dataset.playerId = player.playerId;
+                playerInfo.appendChild(afkBtn);
+            }
+            playerArea.appendChild(playerInfo);
+            const cardContainer = document.createElement('div');
+            cardContainer.className = 'card-container';
+            if (player.playerId === myPersistentPlayerId) {
+                const currentHand = player.hand;
+                currentHand.forEach((card, indexInHand) => {
+                    const originalCardIndex = indexInHand;
+                    const cardEl = createCardElement(card, originalCardIndex);
+                    const isMyTurn = isCurrentPlayer;
+                    const canPlay = isMyTurn && gameState.phase === 'Playing' && !gameState.isPaused && player.status === 'Active';
+                    cardEl.classList.toggle('clickable', canPlay);
+                    cardEl.addEventListener('click', () => {
+                        if (canPlay) {
+                            if (isClientMoveValid(card, gameState)) {
+                                socket.emit('playCard', { cardIndex: originalCardIndex });
+                            } else {
+                                triggerInvalidMoveFeedback(cardEl);
+                            }
+                        }
+                    });
+
+                    // --- *** MODIFIED: Allow drag-to-rearrange anytime *** ---
+                    cardEl.draggable = true;
+                    // --- *** END MODIFICATION *** ---
+
+                    cardContainer.appendChild(cardEl);
+                });
+                cardContainer.ondragstart = e => {
+                    if (!e.target.classList.contains('card') || !e.target.draggable) {
+                        e.preventDefault();
+                        return;
+                    }
+                    draggedCardElement = e.target;
+                    draggedCardIndex = parseInt(e.target.dataset.cardIndex);
+                    setTimeout(() => e.target.classList.add('dragging'), 0);
+                };
+                cardContainer.ondragend = e => {
+                    if (draggedCardElement) {
+                        draggedCardElement.classList.remove('dragging');
+                        draggedCardElement.style.opacity = '1';
+                        const myCurrentPlayerState = window.gameState?.players.find(p => p.playerId === myPersistentPlayerId);
+                        if (myCurrentPlayerState) {
+                            const newElements = [...cardContainer.querySelectorAll('.card')];
+                            const validElements = newElements.filter(el => el !== draggedCardElement || !el.classList.contains('dragging'));
+                            const newIndices = validElements.map(el => parseInt(el.dataset.cardIndex));
+                            const serverHand = myCurrentPlayerState.hand;
+                            if (newIndices.length === serverHand.length && newIndices.every(idx => idx >= 0 && idx < serverHand.length)) {
+                                const reorderedHand = newIndices.map(originalIndex => serverHand[originalIndex]).filter(Boolean);
+                                if (reorderedHand.length === serverHand.length) {
+                                    socket.emit('rearrangeHand', { newHand: reorderedHand });
+                                    myPlayer.hand = reorderedHand;
+                                }
+                            } else {
+                                console.warn("Index mismatch during drag reorder, not sending update.");
+                            }
+                        }
+                        draggedCardElement = null;
+                        draggedCardIndex = -1;
+                    }
+                };
+                cardContainer.ondragover = e => {
+                    e.preventDefault();
+                    
+                    // --- *** MODIFIED: Allow drag-over to rearrange anytime *** ---
+                    if (!draggedCardElement || window.gameState?.isPaused) return;
+                    // --- *** END MODIFICATION *** ---
+
+                    const afterElement = getDragAfterElement(cardContainer, e.clientX);
+                    if (afterElement == null) {
+                        cardContainer.appendChild(draggedCardElement);
+                    } else {
+                        cardContainer.insertBefore(draggedCardElement, afterElement);
+                    }
+                };
+            } else {
+                if (gameState.phase === 'RoundOver' && player.status === 'Active') {
+                    player.hand.forEach((card, cardIndex) => {
+                        const cardEl = createCardElement(card, cardIndex);
+                        cardContainer.appendChild(cardEl);
+                    });
+                } else {
+                    if (player.hand.length === 1 && gameState.phase !== 'GameOver') {
+                        const cardEl = document.createElement('div');
+                        cardEl.className = 'card uno-warning';
+                        const unoSpan = document.createElement('span');
+                        unoSpan.textContent = 'UNO';
+                        cardEl.appendChild(unoSpan);
+                        cardContainer.appendChild(cardEl);
+                    } else {
+                        for (let j = 0; j < player.hand.length; j++) {
+                            const cardEl = document.createElement('div');
+                            cardEl.className = 'card card-back';
+                            cardContainer.appendChild(cardEl);
+                        }
+                    }
+                }
+            }
+            playerArea.appendChild(cardContainer);
+            leftColumn.appendChild(playerArea);
+        });
+    }
     function getDragAfterElement(container, x) { /* ... (unchanged) ... */ const draggableElements = [...container.querySelectorAll('.card:not(.dragging)')]; return draggableElements.reduce((closest, child) => { const box = child.getBoundingClientRect(); const offset = x - box.left - box.width / 2; if (offset < 0 && offset > closest.offset) { return { offset: offset, element: child }; } else { return closest; } }, { offset: Number.NEGATIVE_INFINITY }).element; }
     makeDraggable(document.getElementById('color-picker-modal')); makeDraggable(document.getElementById('drawn-wild-modal')); makeDraggable(document.getElementById('pick-until-modal')); makeDraggable(document.getElementById('swap-modal')); makeDraggable(document.getElementById('deal-choice-modal')); makeDraggable(document.getElementById('confirm-end-game-modal')); makeDraggable(document.getElementById('end-of-round-div')); makeDraggable(document.getElementById('final-score-modal')); makeDraggable(document.getElementById('afk-notification-modal')); makeDraggable(document.getElementById('discard-pile-modal')); makeDraggable(document.getElementById('confirm-afk-modal')); makeDraggable(document.getElementById('discard-wilds-modal'));
     makeDraggable(document.getElementById('confirm-hard-reset-modal'));
