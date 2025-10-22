@@ -77,6 +77,12 @@ function setupGame(lobbyPlayers) {
 function startNewRound(gs) {
     gs.roundNumber++;
     const numPlayers = gs.players.length;
+
+    // --- *** MODIFIED: Moved log entry to be first *** ---
+    const dealer = gs.players[gs.dealerIndex];
+    addLog(`Round ${gs.roundNumber} begins. ${dealer.name} deals ${gs.numCardsToDeal} cards.`);
+    // --- *** END MODIFICATION *** ---
+
     let roundDeck = shuffleDeck(createDeck());
     gs.players.forEach(player => {
         if (player.status === 'Active') {
@@ -94,10 +100,10 @@ function startNewRound(gs) {
     }
     gs.discardPile = [{ card: topCard, playerName: 'Deck' }];
 
-    // --- *** NEW: Log initial discard card *** ---
+    // --- *** Log initial discard card (from previous change) *** ---
     const cardName = `${topCard.color !== 'Black' ? topCard.color + ' ' : ''}${topCard.value}`;
     addLog(`The Deck opened with a ${cardName}.`);
-    // --- *** END MODIFICATION *** ---
+    // --- *** END *** ---
 
     gs.drawPile = roundDeck;
     gs.activeColor = topCard.color;
@@ -110,8 +116,9 @@ function startNewRound(gs) {
     gs.pauseInfo = { pauseEndTime: null, pausedForPlayerNames: [] };
     gs.readyForNextRound = [];
     gs.playerChoosingActionId = null;
-    const dealer = gs.players[gs.dealerIndex];
-    addLog(`Round ${gs.roundNumber} begins. ${dealer.name} deals ${gs.numCardsToDeal} cards.`);
+    
+    // --- *** (Dealing log was removed from here) *** ---
+    
     let firstPlayerIndex = (gs.dealerIndex + 1) % numPlayers;
     while (gs.players[firstPlayerIndex].status !== 'Active') {
         firstPlayerIndex = (firstPlayerIndex + 1) % numPlayers;
@@ -269,15 +276,15 @@ io.on('connection', (socket) => {
         player.unoState = 'declared';
         addLog(`📣 ${player.name} is ready to call UNO!`);
         
-        // --- *** NEW: Add toast notification for successful UNO press *** ---
+        // --- *** Add toast notification for successful UNO press (from previous change) *** ---
         io.to(player.socketId).emit('announce', 'You are ready to say UNO!');
-        // --- *** END MODIFICATION *** ---
+        // --- *** END *** ---
 
         io.emit('updateGameState', gameState);
     }
   });
   
-  // --- *** MODIFIED: Fixed draw penalty vs pick until bug *** ---
+  // --- *** (drawCard logic remains modified from previous change) *** ---
   socket.on('drawCard', () => {
     if (!gameState || !['Playing'].includes(gameState.phase) || gameState.isPaused) return;
     const playerIndex = gameState.players.findIndex(p => p.socketId === socket.id);
@@ -375,10 +382,9 @@ io.on('connection', (socket) => {
                         io.to(socket.id).emit('drawnWildCard', { cardIndex, drawnCard });
                         return; // Wait for player to choose 'play' or 'keep'
                     } else {
-                        // --- *** NEW: Check for auto-UNO on non-wild draw *** ---
-                        // We check if the player's hand *before* this auto-play was 1 card.
+                        // --- *** Check for auto-UNO on non-wild draw (from previous change) *** ---
                         const willAutoUno = player.hand.length === 1;
-                        // --- *** END MODIFICATION *** ---
+                        // --- *** END *** ---
 
                         gameState.discardPile.unshift({ card: drawnCard, playerName: player.name });
                         gameState.activeColor = drawnCard.color;
@@ -387,11 +393,11 @@ io.on('connection', (socket) => {
                         addLog(`...and it was a playable ${drawnCard.color} ${drawnCard.value}!`);
                         player.unoState = 'safe';
 
-                        // --- *** NEW: Emit auto-UNO if condition met *** ---
+                        // --- *** Emit auto-UNO if condition met (from previous change) *** ---
                         if (willAutoUno) {
                             io.emit('unoCalled', { playerName: player.name });
                         }
-                        // --- *** END MODIFICATION *** ---
+                        // --- *** END *** ---
 
                         const numActivePlayers = gameState.players.filter(p => p.status === 'Active').length;
                         if (drawnCard.value === 'Skip' || (drawnCard.value === 'Reverse' && numActivePlayers === 2)) {
