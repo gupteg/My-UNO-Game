@@ -207,7 +207,6 @@ window.addEventListener('DOMContentLoaded', () => {
     socket.on('announce', (message) => { showToast(message); });
     socket.on('youWereMarkedAFK', () => { afkNotificationModal.style.display = 'flex'; });
     socket.on('unoCalled', ({ playerName }) => { showUnoAnnouncement(`${playerName} says UNO!`); });
-    socket.on('unoCallSuccessful', () => { showToast('You are ready to say UNO!'); });
     socket.on('showDiscardWildsModal', (allDiscardedData) => { discardWildsResults.innerHTML = ''; if (allDiscardedData.length === 0) { discardWildsResults.innerHTML = '<h3 class="discard-wilds-empty-msg">...but no other players had any Wild cards!</h3>'; } else { allDiscardedData.forEach(playerData => { const playerGroup = document.createElement('div'); playerGroup.className = 'discard-result-player'; const playerName = document.createElement('p'); playerName.className = 'discard-result-player-name'; playerName.textContent = `${playerData.playerName} discarded:`; playerGroup.appendChild(playerName); const cardContainer = document.createElement('div'); cardContainer.className = 'discard-result-cards'; if (playerData.cards.length === 0) { const noCardsMsg = document.createElement('span'); noCardsMsg.textContent = '(No cards)'; cardContainer.appendChild(noCardsMsg); } else { playerData.cards.forEach(card => { const cardEl = createCardElement(card, -1); cardContainer.appendChild(cardEl); }); } playerGroup.appendChild(cardContainer); discardWildsResults.appendChild(playerGroup); }); } discardWildsModal.style.display = 'flex'; });
     socket.on('animateDraw', ({ playerId, count }) => { animateCardDraw(playerId, count); });
     socket.on('animateSwap', ({ p1_id, p2_id }) => { animateHandSwap(p1_id, p2_id); });
@@ -225,169 +224,10 @@ window.addEventListener('DOMContentLoaded', () => {
     function animateCardDraw(playerId, count) { /* ... (unchanged) ... */ const drawPileEl = document.querySelector('.piles-container .card-back'); const playerAreaEl = document.querySelector(`[data-player-id="${playerId}"] .card-container`); if (!drawPileEl || !playerAreaEl) return; const startRect = drawPileEl.getBoundingClientRect(); const endRect = playerAreaEl.getBoundingClientRect(); const boardRect = gameBoard.getBoundingClientRect(); const smallCardWidth = 80; const scaleFactor = smallCardWidth / startRect.width; for (let i = 0; i < count; i++) { const cardBack = document.createElement('div'); cardBack.className = 'card card-back flying-card'; cardBack.style.top = `${startRect.top - boardRect.top}px`; cardBack.style.left = `${startRect.left - boardRect.top}px`; cardBack.style.width = `${startRect.width}px`; cardBack.style.height = `${startRect.height}px`; cardBack.style.transform = 'scale(1.2)'; gameBoard.appendChild(cardBack); setTimeout(() => { requestAnimationFrame(() => { const top = `${endRect.top - boardRect.top + 10}px`; const left = `${endRect.left - boardRect.left + (i * (smallCardWidth / 4))}px`; cardBack.style.transform = `scale(${scaleFactor})`; cardBack.style.top = top; cardBack.style.left = left; cardBack.style.width = `${smallCardWidth}px`; cardBack.style.height = `${smallCardWidth * 1.5}px`; }); }, i * 100 + 50); setTimeout(() => { cardBack.remove(); }, 800 + (i * 100)); } }
     function animateHandSwap(p1_id, p2_id) { /* ... (unchanged) ... */ const p1_area = document.querySelector(`[data-player-id="${p1_id}"]`); const p2_area = document.querySelector(`[data-player-id="${p2_id}"]`); if (!p1_area || !p2_area) return; const p1_cards = p1_area.querySelectorAll('.card-container .card'); const p2_cards = p2_area.querySelectorAll('.card-container .card'); const boardRect = gameBoard.getBoundingClientRect(); const animateHand = (cards, toArea) => { const endRect = toArea.querySelector('.card-container').getBoundingClientRect(); const clones = []; cards.forEach(card => { const startRect = card.getBoundingClientRect(); const clone = card.cloneNode(true); clone.classList.add('flying-card'); clone.style.top = `${startRect.top - boardRect.top}px`; clone.style.left = `${startRect.left - boardRect.left}px`; gameBoard.appendChild(clone); clones.push(clone); card.style.visibility = 'hidden'; }); clones.forEach((clone, i) => { setTimeout(() => { requestAnimationFrame(() => { const top = `${endRect.top - boardRect.top + 10}px`; const left = `${endRect.left - boardRect.left + (i * 20)}px`; clone.style.top = top; clone.style.left = left; }); }, i * 50); setTimeout(() => clone.remove(), 800 + (i*50)); }); }; animateHand(p1_cards, p2_area); animateHand(p2_cards, p1_area); }
     function renderGameLog(logHistory) { /* ... (unchanged) ... */ if (!gameLogList) return; gameLogList.innerHTML = ''; if (!logHistory) return; const recentLogs = logHistory.slice(0, 8); recentLogs.reverse(); recentLogs.forEach(msg => { const li = document.createElement('li'); li.textContent = msg; gameLogList.prepend(li); }); }
-    function renderFinalScores(finalGameState) { /* ... (unchanged) ... */ const players = finalGameState.players; const numRounds = finalGameState.roundNumber; const table = document.createElement('table'); table.className = 'score-table final-table'; let headerHtml = '<thead><tr><th>Round</th>'; players.forEach(p => { headerHtml += `<th>${p.name}</th>`; }); headerHtml += '</tr></thead>'; let bodyHtml = '<tbody>'; for (let i = 0; i < numRounds; i++) { bodyHtml += `<tr><td>${i + 1}</td>`; players.forEach(p => { const score = p.scoresByRound[i] !== undefined ? p.scoresByRound[i] : '-'; bodyHtml += `<td>${score}</td>`; }); bodyHtml += '</tr>'; } bodyHtml += '</tbody>'; let footerHtml = '<tfoot><tr><td><strong>Total</strong></td>'; let lowestScore = Infinity; players.forEach(p => { if (p.status === 'Active' || p.status === 'Disconnected') { if (p.score < lowestScore) { lowestScore = p.score; } } footerHtml += `<td><strong>${p.score}</strong></td>`; }); footerHtml += '</tr></tfoot>'; table.innerHTML = headerHtml + bodyHtml + footerHtml; finalScoreTableContainer.innerHTML = ''; finalScoreTableContainer.appendChild(table); const winners = players.filter(p => (p.status === 'Active' || p.status === 'Disconnected') && p.score === lowestScore); const winnerNames = winners.map(w => w.name).join(' and '); finalWinnerMessage.textContent = `${winners.length > 1 ? 'Winners' : 'Winner'}: ${winnerNames}!`; }
+    function renderFinalScores(finalGameState) { /* ... (unchanged) ... */ const players = finalGameState.players; const numRounds = finalGameState.roundNumber; const table = document.createElement('table'); table.className = 'score-table final-table'; let headerHtml = '<thead><tr><th>Round</th>'; players.forEach(p => { headerHtml += `<th>${p.name}</th>`; }); headerHtml += '</tr></thead>'; let bodyHtml = '<tbody>'; for (let i = 0; i < numRounds; i++) { bodyHtml += `<tr><td>${i + 1}</td>`; players.forEach(p => { const score = p.scoresByRound[i] !== undefined ? p.scoresByRound[i] : '-'; bodyHtml += `<td>${score}</td>`; }); bodyHtml += '</tr>'; } bodyHtml += '</tbody>'; let footerHtml = '<tfoot><tr><td><strong>Total</strong></td>'; let lowestScore = Infinity; players.forEach(p => { if (p.status === 'Active' || p.status === 'Disconnected') { if (p.score < lowestScore) { lowestScore = p.score; } } footerHtml += `<td><strong>${p.score}</strong></td>`; }); footerHtml += '</tr></tfoot>'; table.innerHTML = headerHtml + bodyHtml + footerHtml; finalScoreTableContainer.innerHTML = ''; finalScoreTableContainer.appendChild(table); const winners = players.filter(p => (p.status === 'Active' || p.status === 'Disconnected') && p.score === lowestScore); const winnerNames = winners.map(w => w.name).join(' and '); finalWinnerMessage.textContent = `${winnerNames} win(s) the game!`; }
     function createCardElement(card, cardIndex) { /* ... (unchanged) ... */ const cardDiv = document.createElement('div'); if (!card || !card.color || !card.value) { console.error("Attempted to create card element with invalid data:", card); cardDiv.className = 'card Black'; cardDiv.textContent = '?'; return cardDiv; } cardDiv.className = `card ${card.color}`; cardDiv.dataset.cardIndex = cardIndex; if (!isNaN(card.value)) { const numberSpan = document.createElement('span'); numberSpan.className = 'number-circle'; numberSpan.textContent = card.value; cardDiv.appendChild(numberSpan); } else { const actionSpan = document.createElement('span'); actionSpan.className = 'action-text'; actionSpan.innerHTML = card.value.replace(/\s/g, '<br>'); cardDiv.appendChild(actionSpan); } return cardDiv; }
     function makeDraggable(element) { /* ... (unchanged) ... */ let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0; const header = element.querySelector('.modal-content h3, .modal-content h2, .modal-content p'); function dragMouseDown(e) { e.preventDefault(); pos3 = e.clientX; pos4 = e.clientY; document.onmouseup = closeDragElement; document.onmousemove = elementDrag; } function touchDown(e) { pos3 = e.touches[0].clientX; pos4 = e.touches[0].clientY; document.ontouchend = closeDragElement; document.ontouchmove = elementTouchDrag; } function elementDrag(e) { e.preventDefault(); pos1 = pos3 - e.clientX; pos2 = pos4 - e.clientY; pos3 = e.clientX; pos4 = e.clientY; let newTop = element.offsetTop - pos2; let newLeft = element.offsetLeft - pos1; element.style.top = newTop + "px"; element.style.left = newLeft + "px"; } function elementTouchDrag(e) { e.preventDefault(); pos1 = pos3 - e.touches[0].clientX; pos2 = pos4 - e.touches[0].clientY; pos3 = e.touches[0].clientX; pos4 = e.touches[0].clientY; let newTop = element.offsetTop - pos2; let newLeft = element.offsetLeft - pos1; element.style.top = newTop + "px"; element.style.left = newLeft + "px"; } function closeDragElement() { document.onmouseup = null; document.onmousemove = null; document.ontouchend = null; document.ontouchmove = null; } if (header) { header.style.cursor = 'move'; header.onmousedown = dragMouseDown; header.ontouchstart = touchDown; } else { const content = element.querySelector('.modal-content'); if (content) { content.style.cursor = 'move'; content.onmousedown = dragMouseDown; content.onmousedown = dragMouseDown; content.ontouchstart = touchDown; } } }
-    
-    // --- *** MODIFIED: Added logic to hide action bar when modals are open *** ---
-    function displayGame(gameState) {
-        window.gameState = gameState;
-        if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
-
-        // Get reference to the main action buttons bar
-        const actionButtonsBar = document.querySelector('.action-buttons');
-
-        // Reset all modals
-        colorPickerModal.style.display = 'none';
-        pickUntilModal.style.display = 'none';
-        dealChoiceModal.style.display = 'none';
-        endOfRoundDiv.style.display = 'none';
-        finalScoreModal.style.display = 'none';
-        swapModal.style.display = 'none';
-        drawnWildModal.style.display = 'none';
-
-        // --- NEW FIX: Hide main action bar if any modal is active ---
-        const isModalPhase = gameState.phase === 'Dealing' ||
-                             gameState.phase === 'ChoosingColor' ||
-                             gameState.phase === 'ChoosingPickUntilAction' ||
-                             gameState.phase === 'ChoosingSwapHands' ||
-                             gameState.phase === 'RoundOver' ||
-                             gameState.phase === 'GameOver';
-
-        if (isModalPhase) {
-            if (actionButtonsBar) actionButtonsBar.style.display = 'none';
-        } else {
-            // Only show if it's not a modal phase (e.g., 'Playing')
-            if (actionButtonsBar) actionButtonsBar.style.display = 'flex';
-        }
-        // --- END FIX ---
-
-        renderPlayers(gameState);
-        renderPiles(gameState);
-        updateDirectionArrow(gameState);
-        renderGameLog(gameState.gameLog || []);
-
-        const myPlayer = gameState.players.find(p => p.playerId === myPersistentPlayerId);
-        if (!myPlayer) { showToast("Error: Could not find your player data."); return; }
-
-        const currentPlayer = gameState.players[gameState.currentPlayerIndex];
-        const playerChoosingAction = gameState.players.find(p => p.playerId === gameState.playerChoosingActionId);
-        const isMyTurn = myPlayer && currentPlayer?.playerId === myPlayer.playerId;
-        const amIChoosingAction = myPlayer && playerChoosingAction?.playerId === myPlayer.playerId;
-        const isPaused = gameState.isPaused;
-        const isHost = myPlayer.isHost;
-
-        if (actionBar) { actionBar.textContent = getActionBarText(gameState, currentPlayer, playerChoosingAction); }
-
-        // Show the correct modal (action bar is already hidden)
-        switch (gameState.phase) {
-            case 'ChoosingColor':
-                if (amIChoosingAction && !isPaused) colorPickerModal.style.display = 'flex';
-                break;
-            case 'ChoosingPickUntilAction':
-                if (amIChoosingAction && !isPaused) pickUntilModal.style.display = 'flex';
-                break;
-            case 'ChoosingSwapHands':
-                if (amIChoosingAction && !isPaused) {
-                    const swapOptions = document.getElementById('swap-player-options');
-                    swapOptions.innerHTML = '';
-                    gameState.players.forEach(player => {
-                        if (player.playerId !== myPersistentPlayerId && player.status === 'Active') {
-                            const button = document.createElement('button');
-                            button.textContent = player.name;
-                            button.className = 'player-swap-btn';
-                            button.dataset.playerId = player.playerId;
-                            swapOptions.appendChild(button);
-                        }
-                    });
-                    swapModal.style.display = 'flex';
-                }
-                break;
-            case 'Dealing':
-                if (amIChoosingAction && !isPaused) dealChoiceModal.style.display = 'flex';
-                break;
-            case 'RoundOver':
-                endOfRoundDiv.style.display = 'flex';
-                const me = gameState.players.find(p => p.playerId === myPersistentPlayerId);
-                const isReady = gameState.readyForNextRound.includes(myPersistentPlayerId);
-                if (me && !me.isHost) {
-                    nextRoundOkBtn.style.display = 'block';
-                    hostRoundEndControls.style.display = 'none';
-                    if (isReady) {
-                        nextRoundOkBtn.disabled = true;
-                        nextRoundOkBtn.textContent = 'Waiting for Host...';
-                    } else {
-                        nextRoundOkBtn.disabled = false;
-                        nextRoundOkBtn.textContent = 'OK';
-                    }
-                } else if (me && me.isHost) {
-                    nextRoundOkBtn.style.display = 'none';
-                    hostRoundEndControls.style.display = 'flex';
-                    if (isReady) {
-                        nextRoundBtn.disabled = true;
-                        nextRoundBtn.textContent = 'Waiting...';
-                    } else {
-                        nextRoundBtn.disabled = false;
-                        nextRoundBtn.textContent = 'Start Next Round';
-                    }
-                }
-                break;
-            case 'GameOver':
-                finalScoreModal.style.display = 'flex';
-                break;
-        }
-
-        // This logic now only runs when the action bar is visible
-        endGameBtn.style.display = (isHost && gameState.phase !== 'RoundOver' && gameState.phase !== 'GameOver') ? 'block' : 'none';
-        if (unoBtn) {
-            const colorMap = { "Red": "#ff5555", "Green": "#55aa55", "Blue": "#5555ff", "Yellow": "#ffaa00" };
-            unoBtn.style.backgroundColor = colorMap[gameState.activeColor] || '#333';
-            const canDeclareUno = isMyTurn && gameState.phase === 'Playing' && myPlayer.hand.length === 2 && !isPaused;
-            unoBtn.disabled = !canDeclareUno;
-            unoBtn.classList.toggle('uno-ready', canDeclareUno);
-        }
-        if (drawCardBtn) {
-            let drawBtnText = 'DRAW CARD';
-            let drawBtnDisabled = true;
-            if (!isPaused && gameState.phase === 'Playing') {
-                if (isMyTurn) {
-                    const pickUntilInfo = gameState.pickUntilState;
-                    const isPickingUntil = pickUntilInfo?.active && pickUntilInfo.targetPlayerIndex === gameState.currentPlayerIndex;
-                    if (isPickingUntil) {
-                        drawBtnText = `${currentPlayer.name} PICKS FOR ${pickUntilInfo.targetColor.toUpperCase()}`;
-                        drawBtnDisabled = false;
-                    } else if (gameState.drawPenalty > 0) {
-                        drawBtnText = `${currentPlayer.name} DRAWS ${gameState.drawPenalty}`;
-                        drawBtnDisabled = false;
-                    } else {
-                        drawBtnText = 'DRAW CARD';
-                        drawBtnDisabled = false;
-                        if (playerHasPlayableNonWildCard(gameState)) {
-                            drawBtnDisabled = true;
-                        }
-                    }
-                } else {
-                    drawBtnDisabled = true;
-                    const pickUntilInfo = gameState.pickUntilState;
-                    const isPickingUntil = pickUntilInfo?.active && pickUntilInfo.targetPlayerIndex === gameState.currentPlayerIndex;
-                    if(isPickingUntil) {
-                        drawBtnText = `${currentPlayer?.name} PICKS FOR ${pickUntilInfo.targetColor.toUpperCase()}`;
-                    } else if (gameState.drawPenalty > 0 && gameState.currentPlayerIndex === gameState.players.findIndex(p => p.playerId === currentPlayer?.playerId)) {
-                        drawBtnText = `${currentPlayer?.name} DRAWS ${gameState.drawPenalty}`;
-                    } else {
-                        drawBtnText = 'DRAW CARD';
-                    }
-                }
-            } else {
-                drawBtnDisabled = true;
-                drawBtnText = 'DRAW CARD';
-            }
-            drawCardBtn.textContent = drawBtnText;
-            drawCardBtn.disabled = drawBtnDisabled;
-        }
-    }
-    // --- *** END MODIFICATION *** ---
-
+    function displayGame(gameState) { /* ... (unchanged) ... */ window.gameState = gameState; if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; } colorPickerModal.style.display = 'none'; pickUntilModal.style.display = 'none'; dealChoiceModal.style.display = 'none'; endOfRoundDiv.style.display = 'none'; finalScoreModal.style.display = 'none'; swapModal.style.display = 'none'; drawnWildModal.style.display = 'none'; renderPlayers(gameState); renderPiles(gameState); updateDirectionArrow(gameState); renderGameLog(gameState.gameLog || []); const myPlayer = gameState.players.find(p => p.playerId === myPersistentPlayerId); if (!myPlayer) { showToast("Error: Could not find your player data."); return; } const currentPlayer = gameState.players[gameState.currentPlayerIndex]; const playerChoosingAction = gameState.players.find(p => p.playerId === gameState.playerChoosingActionId); const isMyTurn = myPlayer && currentPlayer?.playerId === myPlayer.playerId; const amIChoosingAction = myPlayer && playerChoosingAction?.playerId === myPlayer.playerId; const isPaused = gameState.isPaused; const isHost = myPlayer.isHost; if (actionBar) { actionBar.textContent = getActionBarText(gameState, currentPlayer, playerChoosingAction); } switch (gameState.phase) { case 'ChoosingColor': if (amIChoosingAction && !isPaused) colorPickerModal.style.display = 'flex'; break; case 'ChoosingPickUntilAction': if (amIChoosingAction && !isPaused) pickUntilModal.style.display = 'flex'; break; case 'ChoosingSwapHands': if (amIChoosingAction && !isPaused) { const swapOptions = document.getElementById('swap-player-options'); swapOptions.innerHTML = ''; gameState.players.forEach(player => { if (player.playerId !== myPersistentPlayerId && player.status === 'Active') { const button = document.createElement('button'); button.textContent = player.name; button.className = 'player-swap-btn'; button.dataset.playerId = player.playerId; swapOptions.appendChild(button); } }); swapModal.style.display = 'flex'; } break; case 'Dealing': if (amIChoosingAction && !isPaused) dealChoiceModal.style.display = 'flex'; break; case 'RoundOver': endOfRoundDiv.style.display = 'flex'; const me = gameState.players.find(p => p.playerId === myPersistentPlayerId); const isReady = gameState.readyForNextRound.includes(myPersistentPlayerId); if (me && !me.isHost) { nextRoundOkBtn.style.display = 'block'; hostRoundEndControls.style.display = 'none'; if (isReady) { nextRoundOkBtn.disabled = true; nextRoundOkBtn.textContent = 'Waiting for Host...'; } else { nextRoundOkBtn.disabled = false; nextRoundOkBtn.textContent = 'OK'; } } else if (me && me.isHost) { nextRoundOkBtn.style.display = 'none'; hostRoundEndControls.style.display = 'flex'; if (isReady) { nextRoundBtn.disabled = true; nextRoundBtn.textContent = 'Waiting...'; } else { nextRoundBtn.disabled = false; nextRoundBtn.textContent = 'Start Next Round'; } } break; case 'GameOver': finalScoreModal.style.display = 'flex'; break; } endGameBtn.style.display = (isHost && gameState.phase !== 'RoundOver' && gameState.phase !== 'GameOver') ? 'block' : 'none'; if (unoBtn) { const colorMap = { "Red": "#ff5555", "Green": "#55aa55", "Blue": "#5555ff", "Yellow": "#ffaa00" }; unoBtn.style.backgroundColor = colorMap[gameState.activeColor] || '#333'; const canDeclareUno = isMyTurn && gameState.phase === 'Playing' && myPlayer.hand.length === 2 && !isPaused; unoBtn.disabled = !canDeclareUno; unoBtn.classList.toggle('uno-ready', canDeclareUno); } if (drawCardBtn) { let drawBtnText = 'DRAW CARD'; let drawBtnDisabled = true; if (!isPaused && gameState.phase === 'Playing') { if (isMyTurn) { const pickUntilInfo = gameState.pickUntilState; const isPickingUntil = pickUntilInfo?.active && pickUntilInfo.targetPlayerIndex === gameState.currentPlayerIndex; if (isPickingUntil) { drawBtnText = `${currentPlayer.name} PICKS FOR ${pickUntilInfo.targetColor.toUpperCase()}`; drawBtnDisabled = false; } else if (gameState.drawPenalty > 0) { drawBtnText = `${currentPlayer.name} DRAWS ${gameState.drawPenalty}`; drawBtnDisabled = false; } else { drawBtnText = 'DRAW CARD'; drawBtnDisabled = false; if (playerHasPlayableNonWildCard(gameState)) { drawBtnDisabled = true; } } } else { drawBtnDisabled = true; const pickUntilInfo = gameState.pickUntilState; const isPickingUntil = pickUntilInfo?.active && pickUntilInfo.targetPlayerIndex === gameState.currentPlayerIndex; if(isPickingUntil) { drawBtnText = `${currentPlayer?.name} PICKS FOR ${pickUntilInfo.targetColor.toUpperCase()}`; } else if (gameState.drawPenalty > 0 && gameState.currentPlayerIndex === gameState.players.findIndex(p => p.playerId === currentPlayer?.playerId)) { drawBtnText = `${currentPlayer?.name} DRAWS ${gameState.drawPenalty}`; } else { drawBtnText = 'DRAW CARD'; } } } else { drawBtnDisabled = true; drawBtnText = 'DRAW CARD'; } drawCardBtn.textContent = drawBtnText; drawCardBtn.disabled = drawBtnDisabled; } }
     function getActionBarText(gameState, currentPlayer, playerChoosingAction) { /* ... (unchanged) ... */ if (gameState.isPaused && gameState.pauseInfo?.pauseEndTime) { const { pauseEndTime, pausedForPlayerNames } = gameState.pauseInfo; const names = pausedForPlayerNames.join(', '); const updateTimer = () => { const remaining = Math.max(0, Math.floor((pauseEndTime - Date.now()) / 1000)); actionBar.textContent = `Waiting ${remaining}s for ${names} to rejoin...`; if (!countdownInterval && remaining > 0) { countdownInterval = setInterval(updateTimer, 1000); } else if (remaining <= 0 && countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; } }; updateTimer(); return actionBar.textContent; } if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; } switch(gameState.phase) { case 'Lobby': return "Waiting for players..."; case 'Dealing': return playerChoosingAction ? `Waiting for ${playerChoosingAction.name} (Dealer) to deal...` : 'Waiting for dealer...'; case 'Playing': if (gameState.pickUntilState?.active && gameState.pickUntilState.targetPlayerIndex === gameState.currentPlayerIndex) { return `${currentPlayer.name} must pick until they find a ${gameState.pickUntilState.targetColor}!`; } else if (gameState.drawPenalty > 0 && gameState.currentPlayerIndex === gameState.players.findIndex(p => p.playerId === currentPlayer?.playerId)) { return `${currentPlayer.name} must draw ${gameState.drawPenalty}!`; } return currentPlayer ? `Waiting for ${currentPlayer.name} to play...` : 'Waiting for player...'; case 'ChoosingColor': return playerChoosingAction ? `${playerChoosingAction.name} is choosing a color...` : 'Choosing a color...'; case 'ChoosingPickUntilAction': return playerChoosingAction ? `${playerChoosingAction.name} is choosing Wild Pick Until action...` : 'Choosing action...'; case 'ChoosingSwapHands': return playerChoosingAction ? `${playerChoosingAction.name} is choosing who to swap with...` : 'Choosing swap target...'; case 'RoundOver': const host = gameState.players.find(p => p.isHost); const hostIsReady = gameState.readyForNextRound.includes(host?.playerId); const connectedPlayers = gameState.players.filter(p => p.status === 'Active'); const allReady = gameState.readyForNextRound.length === connectedPlayers.length; if (hostIsReady && !allReady) { const waitingOnPlayers = connectedPlayers.filter(p => !gameState.readyForNextRound.includes(p.playerId)); const waitingOnNames = waitingOnPlayers.map(p => p.name).join(', '); return `Waiting for ${waitingOnNames} to click OK...`; } else if (!hostIsReady && allReady) { return `Waiting for ${host?.name} (Host) to start next round...`; } else { return `Round Over! Waiting for players...`; } case 'GameOver': return "Game Over!"; default: "Loading..."; } }
     function updateDirectionArrow(gameState) { /* ... (unchanged) ... */ const currentDirectionArrow = document.getElementById('direction-arrow'); if (!currentDirectionArrow) { console.error("Direction arrow element not found"); return; } currentDirectionArrow.classList.toggle('reversed', gameState.playDirection === -1); const arrowSvgPath = currentDirectionArrow.querySelector('svg path'); if (arrowSvgPath) { const activeColor = gameState.activeColor || 'Black'; const colorMap = { "Red": "#ff5555", "Green": "#55aa55", "Blue": "#5555ff", "Yellow": "#ffaa00", "Black": "#FFFFFF" }; arrowSvgPath.style.fill = colorMap[activeColor] || '#FFFFFF'; } }
     function renderPiles(gameState) { /* ... (unchanged) ... */ const pilesArea = document.getElementById('piles-area'); pilesArea.innerHTML = ''; const pilesContainer = document.createElement('div'); pilesContainer.className = 'piles-container'; const drawPileWrapper = document.createElement('div'); drawPileWrapper.className = 'pile-wrapper'; const drawPileTitle = document.createElement('h4'); drawPileTitle.textContent = 'Draw Pile'; const drawCount = document.createElement('div'); drawCount.className = 'pile-count'; drawCount.textContent = `(${gameState.drawPile.length} Cards)`; const cardBackElement = document.createElement('div'); cardBackElement.className = 'card card-back'; cardBackElement.innerHTML = 'U<br>N<br>O'; drawPileWrapper.appendChild(drawPileTitle); drawPileWrapper.appendChild(drawCount); drawPileWrapper.appendChild(cardBackElement); pilesContainer.appendChild(drawPileWrapper); const arrowElement = document.createElement('div'); arrowElement.id = 'direction-arrow'; arrowElement.innerHTML = ` <svg viewBox="0 0 100 220" preserveAspectRatio="xMidYMid meet" style="width: 100%; height: 100%; filter: drop-shadow(1px 1px 2px black);"> <path d="M50 210 L95 170 L80 170 L80 10 L20 10 L20 170 L5 170 Z" /> </svg> `; pilesContainer.appendChild(arrowElement); const discardPileWrapper = document.createElement('div'); discardPileWrapper.className = 'pile-wrapper'; const discardPileTitle = document.createElement('h4'); discardPileTitle.textContent = 'Discard Pile'; const discardCount = document.createElement('div'); discardCount.className = 'pile-count'; discardCount.textContent = `(${gameState.discardPile.length} Cards)`; const discardPileDiv = document.createElement('div'); discardPileDiv.id = 'discard-pile-dropzone'; const topDiscard = gameState.discardPile[0]; if (topDiscard && topDiscard.card) { const topCardElement = createCardElement(topDiscard.card, -1); discardPileDiv.appendChild(topCardElement); } discardPileWrapper.appendChild(discardPileTitle); discardPileWrapper.appendChild(discardCount); discardPileWrapper.appendChild(discardPileDiv); pilesContainer.appendChild(discardPileWrapper); pilesArea.appendChild(pilesContainer); const dropZone = document.getElementById('discard-pile-dropzone'); if (dropZone) { dropZone.ondragover = (e) => { e.preventDefault(); dropZone.classList.add('over'); }; dropZone.ondragleave = () => { dropZone.classList.remove('over'); }; dropZone.ondrop = (e) => { e.preventDefault(); dropZone.classList.remove('over'); if (draggedCardIndex !== -1) { const myPlayer = window.gameState?.players.find(p => p.playerId === myPersistentPlayerId); const currentPlayer = window.gameState?.players[window.gameState.currentPlayerIndex]; const isMyTurn = myPlayer && currentPlayer && currentPlayer.playerId === myPlayer.playerId; if(window.gameState && isMyTurn && window.gameState.phase === 'Playing' && !window.gameState.isPaused) { const playedCard = myPlayer.hand[draggedCardIndex]; if (isClientMoveValid(playedCard, window.gameState)) { socket.emit('playCard', { cardIndex: draggedCardIndex }); } else { if (draggedCardElement) { triggerInvalidMoveFeedback(draggedCardElement); } } } if (draggedCardElement) draggedCardElement.style.opacity = '1'; draggedCardElement = null; draggedCardIndex = -1; } }; } }
