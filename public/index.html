@@ -2,17 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>UNO!</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UNO Game</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#4a2c2a"/>
 </head>
 <body>
 
     <div id="join-screen">
-        <h1>UNO!</h1>
-        <p>The Classic Card Game</p>
+        <h1>UNO Online</h1>
         <input type="text" id="player-name-input" placeholder="Enter your name">
         <button id="join-game-btn">Join Game</button>
     </div>
@@ -22,13 +19,13 @@
         <h3>Players:</h3>
         <ul id="player-list"></ul>
 
-        <div id="player-lobby-actions" class="lobby-actions">
+        <div id="player-lobby-actions" class="lobby-actions" style="display: none;">
             <button id="ready-btn">Ready</button>
         </div>
 
         <div id="host-lobby-actions" class="lobby-actions" style="display: none;">
             <div id="host-controls">
-                <input type="password" id="host-password-input" placeholder="Host Password">
+                <input type="password" id="host-password-input" placeholder="Host Password (Optional)">
                 <button id="start-game-btn">Start Game</button>
                 <button id="hard-reset-btn" class="danger-btn">Hard Reset</button>
             </div>
@@ -37,57 +34,28 @@
         <p id="host-message" style="display: none;">(Waiting for the host to start the game)</p>
     </div>
 
-    <div id="game-board-container" style="display: none;">
-        
-        <div id="game-status-banner">
-            Waiting for game to start...
-        </div>
+
+    <div id="game-board" style="display: none;">
+        <div id="action-bar">Waiting for game to start...</div>
 
         <div id="move-announcement-banner" class="hidden"></div>
 
-        <div id="game-board">
-            
-            <div id="top-panel">
-                <div id="opponent-hands">
-                    </div>
+        <div id="invalid-move-callout">Invalid Move!</div>
+        <div id="toast-notification"></div>
+        <div id="left-column"></div>
+        <div id="right-column">
+            <div id="piles-area">
+                </div>
+            <div class="action-buttons">
+                <button id="drawCardBtn">DRAW CARD</button>
+                <button id="unoBtn">UNO</button>
+                <button id="arrangeHandBtn">Arrange My Hand</button>
+                <button id="showDiscardPileBtn">DISCARD PILE</button>
+                <button id="endGameBtn" style="display: none;">END GAME</button>
             </div>
-
-            <div id="middle-panel">
-                <div id="draw-pile-container" class="card-pile-container">
-                    <button id="draw-card-btn">
-                        <img src="/assets/cards/card_back.png" alt="Draw Pile" class="card-img">
-                        <span id="draw-pile-count">0</span>
-                    </button>
-                    <div id="draw-pile-label">DRAW DECK</div>
-                </div>
-
-                <div id="discard-pile-container" class="card-pile-container">
-                    <img src="/assets/cards/card_back.png" alt="Discard Pile" id="discard-pile-card" class="card-img">
-                    <div id="discard-pile-label">DISCARD PILE</div>
-                </div>
-
-                <div id="game-info-panel">
-                    <div id="current-color-indicator"></div>
-                    <div id="turn-order-indicator"></div>
-                </div>
-            </div>
-            
-            <div id="player-hand-container">
-                <div id="player-hand-scroll-wrapper">
-                    <div id="my-hand">
-                        </div>
-                </div>
-            </div>
-            
-            <div id="action-panel">
-                <button id="uno-btn" class="action-btn">UNO!</button>
-                <div id="my-info">
-                    <span id="my-name">Player</span>
-                    (<span id="my-card-count">0</span> cards)
-                </div>
-                <button id="show-players-btn" class="action-btn">Players</button>
-                <button id="show-logs-btn" class="action-btn">Log</button>
-                <button id="end-game-btn" class="action-btn danger-btn" style="display: none;">End Game</button>
+            <div id="game-log-container">
+                <h4>Game Log</h4>
+                <ul id="game-log-list"></ul>
             </div>
         </div>
     </div>
@@ -100,212 +68,121 @@
         </div>
     </div>
 
-    <div id="players-modal" class="modal hidden">
+    <div id="uno-announcement-overlay"><div id="uno-announcement-text">UNO!</div></div>
+    
+    <div id="end-of-round-div" class="modal" style="display: none;">
         <div class="modal-content">
-            <div class="modal-header">
-                <h2>Players</h2>
-                <button id="players-modal-close" class="close-btn">&times;</button>
-            </div>
-            <div class="modal-scrollable-content">
-                <table id="players-table">
-                    <thead>
-                        <tr>
-                            <th>Player</th>
-                            <th class="col-cards">Cards</th>
-                            <th class="col-score">Score</th>
-                            <th class="col-uno">UNO?</th>
-                            <th id="host-action-col-header" class="col-action">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="players-table-body">
-                        </tbody>
-                </table>
-            </div>
-            <div class="modal-actions">
-                <button id="players-modal-ok-btn" class="confirm-btn">OK</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="game-log-modal" class="modal hidden">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Game Log</h2>
-                <button id="game-log-modal-close" class="close-btn">&times;</button>
-            </div>
-            <div class="modal-scrollable-content" id="game-log-content">
+            <h2 id="winner-message"></h2>
+            <div id="scores-display"></div>
+            
+            <h4 class="final-hands-header">Final Hands:</h4>
+            <div id="round-over-hands">
                 </div>
-            <div class="modal-actions">
-                <button id="game-log-modal-ok-btn" class="confirm-btn">OK</button>
+            
+            <div class="modal-buttons-container" id="host-round-end-controls" style="display: none;">
+                <button id="next-round-btn">Start Next Round</button>
+                <button id="end-game-round-btn">End Game</button>
+            </div>
+            <button id="next-round-ok-btn" style="display: none;">OK</button>
+        </div>
+    </div>
+    
+    <div id="color-picker-modal" class="modal" style="display: none;"><div class="modal-content"><h3>Choose the next color:</h3><div class="color-options"><button class="color-btn" data-color="Red"></button><button class="color-btn" data-color="Green"></button><button class="color-btn" data-color="Blue"></button><button class="color-btn" data-color="Yellow"></button></div></div></div>
+    <div id="pick-until-modal" class="modal modal-choice" style="display: none;"><div class="modal-content"><h3>Choose an action for Wild Pick Until:</h3><div class="action-options"><button id="option-pick-color">Next player picks until color</button><button id="option-discard-wilds">All players discard Wilds</button></div></div></div>
+    <div id="swap-modal" class="modal modal-choice" style="display: none;"><div id="swap-modal-content" class="modal-content"><h3>Choose a player to swap hands with:</h3><div id="swap-player-options" class="action-options"></div></div></div>
+
+    <div id="drawn-wild-modal" class="modal modal-choice" style="display: none;">
+        <div class="modal-content">
+            <h3>You drew a playable Wild card!</h3>
+            <h4 id="drawn-wild-card-name"></h4>
+            <div class="action-options">
+                <button id="option-play-wild">Play Card</button>
+                <button id="option-keep-wild">Keep Card & Pass Turn</button>
             </div>
         </div>
     </div>
 
-    <div id="choose-color-modal" class="modal hidden">
+    <div id="deal-choice-modal" class="modal modal-choice" style="display: none;"><div class="modal-content"><h3>You are the dealer!</h3><p>Choose how many cards to deal for this round:</p><input type="number" id="deal-cards-input" value="7" min="1" max="13"><button id="deal-cards-btn">Deal Cards</button></div></div>
+
+    <div id="confirm-end-game-modal" class="modal" style="display: none;">
         <div class="modal-content">
-            <div class="modal-header">
-                <h2>Choose a Color</h2>
-            </div>
-            <div class="color-picker">
-                <button class="color-choice" id="color-choice-red" data-color="Red"></button>
-                <button class="color-choice" id="color-choice-green" data-color="Green"></button>
-                <button class="color-choice" id="color-choice-blue" data-color="Blue"></button>
-                <button class="color-choice" id="color-choice-yellow" data-color="Yellow"></button>
+            <h3>End Game</h3>
+            <p>Do you want to end this game?</p>
+            <div class="modal-buttons-container">
+                <button id="confirm-end-yes-btn">Yes</button>
+                <button id="confirm-end-no-btn">No</button>
             </div>
         </div>
     </div>
 
-    <div id="wild-swap-modal" class="modal hidden">
+    <div id="confirm-hard-reset-modal" class="modal" style="display: none;">
         <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="wild-swap-title">Choose a Color</h2>
-            </div>
-            <div class="modal-scrollable-content">
-                <div id="wild-swap-color-picker" class="color-picker" style="margin-bottom: 20px;">
-                    <button class="color-choice" data-color="Red"></button>
-                    <button class="color-choice" data-color="Green"></button>
-                    <button class="color-choice" data-color="Blue"></button>
-                    <button class="color-choice" data-color="Yellow"></button>
-                </div>
-                <div id="wild-swap-player-list" style="display: none;">
-                    <h3>Now, choose a player to swap hands with:</h3>
-                    <ul id="swap-player-list-ul">
-                        </ul>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div id="wild-pick-until-modal" class="modal hidden">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="wild-pick-until-title">Choose a Color</h2>
-            </div>
-            <div class="modal-scrollable-content">
-                <div id="wild-pick-color-picker" class="color-picker" style="margin-bottom: 20px;">
-                    <button class="color-choice" data-color="Red"></button>
-                    <button class="color-choice" data-color="Green"></button>
-                    <button class="color-choice" data-color="Blue"></button>
-                    <button class="color-choice" data-color="Yellow"></button>
-                </div>
-                <div id="wild-pick-action-buttons" style="display: none;">
-                    <p>You chose <span id="wild-pick-chosen-color" style="font-weight: bold;"></span>.</p>
-                    <p>What would you like to do?</p>
-                    <div class="modal-actions" style="flex-direction: column; gap: 10px;">
-                        <button id="wild-pick-action-pick" class="confirm-btn" style="width: 100%;">Make next player pick until this color</button>
-                        <button id="wild-pick-action-discard" class="danger-btn" style="width: 100%;">Make ALL other players discard Wilds</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div id="wild-draw-choice-modal" class="modal hidden">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>You Drew a Wild Card!</h2>
-            </div>
-            <p>You drew a playable Wild card. Do you want to play it now?</p>
-            <div id="drawn-wild-card-display"></div>
-            <div class="modal-actions">
-                <button id="play-drawn-wild-btn" class="confirm-btn">Yes, Play It</button>
-                <button id="keep-drawn-wild-btn">No, Keep It</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="game-over-modal" class="modal hidden">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="game-over-title">Game Over!</h2>
-            </div>
-            <p id="game-over-winner-text"></p>
-            <div id="game-over-scoreboard" class="modal-scrollable-content">
-                </div>
-            <p id="game-over-lobby-caption">You will be taken to the lobby shortly...</p>
-        </div>
-    </div>
-
-    <div id="scoreboard-modal" class="modal hidden">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="scoreboard-title">Round 1 Complete!</h2>
-                <button id="scoreboard-modal-close" class="close-btn">&times;</button>
-            </div>
-            <p id="scoreboard-winner-text"></p>
-            <div id="scoreboard-content" class="modal-scrollable-content">
-                <h4 class="final-hands-header">Final Hands:</h4>
-                <div id="round-over-hands">
-                    </div>
-            </div>
-            <div class="modal-actions">
-                <button id="scoreboard-next-round-btn" class="confirm-btn">Start Next Round</button>
-                <button id="scoreboard-ok-btn" class="confirm-btn">OK</button>
-                <button id="scoreboard-end-game-btn" class="danger-btn">End Game</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="confirm-end-game-modal" class="modal hidden">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>End Game</h2>
-            </div>
-            <p>Are you sure you want to end this game for all players?</p>
-            <div class="modal-actions">
-                <button id="confirm-end-yes-btn" class="danger-btn">Yes, End Game</button>
-                <button id="confirm-end-no-btn">No, Cancel</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="confirm-hard-reset-modal" class="modal hidden">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Hard Reset Session</h2>
-            </div>
-            <p>Are you sure? This will disconnect all players (including you) and reset the server.</p>
-            <div class="modal-actions">
+            <h3>Hard Reset Session</h3>
+            <p>Are you sure? This will end any active game and remove all other players from the lobby.</p>
+            <div class="modal-buttons-container">
                 <button id="confirm-reset-yes-btn" class="danger-btn">Yes, Hard Reset</button>
                 <button id="confirm-reset-no-btn">No, Cancel</button>
             </div>
         </div>
     </div>
 
-    <div id="afk-notification-modal" class="modal hidden">
-         <div class="modal-content">
-            <div class="modal-header">
-                <h2>You were marked as AFK</h2>
+    <div id="final-score-modal" class="modal" style="display: none;">
+        <div class="modal-content wide">
+            <h2 id="final-winner-message"></h2>
+            <div id="final-score-table-container"></div>
+            <p id="lobby-wait-message" style="display: none; margin-top: 15px; font-style: italic;"></p>
+            <div class="modal-buttons-container">
+                <button id="final-score-ok-btn">OK</button>
             </div>
-            <p>The host has marked you as AFK. The game is paused for 60 seconds.</p>
-            <div class="modal-actions">
-                <button id="im-back-btn" class="confirm-btn">I'm Back!</button>
+        </div>
+    </div>
+    <div id="afk-notification-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3>You were marked as AFK!</h3>
+            <p>The game is paused. Click below to return.</p>
+            <div class="modal-buttons-container">
+                <button id="im-back-btn">I'm Back!</button>
             </div>
         </div>
     </div>
 
-    <div id="warning-modal" class="modal hidden">
+    <div id="discard-pile-modal" class="modal" style="display: none;">
         <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="warning-modal-title">Alert</h2>
-            </div>
-            <p id="warning-modal-text"></p>
-            <div class="modal-actions">
-                <button id="warning-modal-ok-btn">OK</button>
+            <h3>Discard Pile (Last 10)</h3>
+            <p>(Newest on top)</p>
+            <div id="discard-pile-list">
+                </div>
+            <div class="modal-buttons-container">
+                <button id="discard-pile-ok-btn">OK</button>
             </div>
         </div>
     </div>
 
-    <div id="waiting-for-host-modal" class="modal hidden">
+    <div id="confirm-afk-modal" class="modal" style="display: none;">
         <div class="modal-content">
-            <div class="modal-header">
-                <h2>Please Wait</h2>
+            <h3>Confirm AFK</h3>
+            <p>Are you sure you want to mark <span id="confirm-afk-player-name">this player</span> as AFK?</p>
+            <div class="modal-buttons-container">
+                <button id="confirm-afk-yes-btn">Yes</button>
+                <button id="confirm-afk-no-btn">No</button>
             </div>
-            <p>Please wait for the host to start the next round.</p>
         </div>
     </div>
+
+    <div id="discard-wilds-modal" class="modal" style="display: none;">
+        <div class="modal-content wide">
+            <h3>All Wilds Discarded!</h3>
+            <div id="discard-wilds-results">
+                </div>
+            <div class="modal-buttons-container">
+                <button id="discard-wilds-ok-btn">OK</button>
+            </div>
+        </div>
+    </div>
+
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="game.js"></script>
+
 </body>
 </html>
