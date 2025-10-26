@@ -8,7 +8,6 @@ window.addEventListener('DOMContentLoaded', () => {
     let playerIdToMarkAFK = null;
     
     let previousGameState = null; // For move announcement diff
-    let moveAnnouncementTimeout = null; // Timer for move announcement (unused now)
     let rainInterval = null; // Timer for rain animation
 
     // --- SCREEN & ELEMENT REFERENCES ---
@@ -295,22 +294,7 @@ window.addEventListener('DOMContentLoaded', () => {
     function animateCardDraw(playerId, count) { /* ... (unchanged) ... */ const drawPileEl = document.querySelector('.piles-container .card-back'); const playerAreaEl = document.querySelector(`[data-player-id="${playerId}"] .card-container`); if (!drawPileEl || !playerAreaEl) return; const startRect = drawPileEl.getBoundingClientRect(); const endRect = playerAreaEl.getBoundingClientRect(); const boardRect = gameBoard.getBoundingClientRect(); const smallCardWidth = 80; const scaleFactor = smallCardWidth / startRect.width; for (let i = 0; i < count; i++) { const cardBack = document.createElement('div'); cardBack.className = 'card card-back flying-card'; cardBack.style.top = `${startRect.top - boardRect.top}px`; cardBack.style.left = `${startRect.left - boardRect.top}px`; cardBack.style.width = `${startRect.width}px`; cardBack.style.height = `${startRect.height}px`; cardBack.style.transform = 'scale(1.2)'; gameBoard.appendChild(cardBack); setTimeout(() => { requestAnimationFrame(() => { const top = `${endRect.top - boardRect.top + 10}px`; const left = `${endRect.left - boardRect.left + (i * (smallCardWidth / 4))}px`; cardBack.style.transform = `scale(${scaleFactor})`; cardBack.style.top = top; cardBack.style.left = left; cardBack.style.width = `${smallCardWidth}px`; cardBack.style.height = `${smallCardWidth * 1.5}px`; }); }, i * 100 + 50); setTimeout(() => { cardBack.remove(); }, 800 + (i * 100)); } }
     function animateHandSwap(p1_id, p2_id) { /* ... (unchanged) ... */ const p1_area = document.querySelector(`[data-player-id="${p1_id}"]`); const p2_area = document.querySelector(`[data-player-id="${p2_id}"]`); if (!p1_area || !p2_area) return; const p1_cards = p1_area.querySelectorAll('.card-container .card'); const p2_cards = p2_area.querySelectorAll('.card-container .card'); const boardRect = gameBoard.getBoundingClientRect(); const animateHand = (cards, toArea) => { const endRect = toArea.querySelector('.card-container').getBoundingClientRect(); const clones = []; cards.forEach(card => { const startRect = card.getBoundingClientRect(); const clone = card.cloneNode(true); clone.classList.add('flying-card'); clone.style.top = `${startRect.top - boardRect.top}px`; clone.style.left = `${startRect.left - boardRect.left}px`; gameBoard.appendChild(clone); clones.push(clone); card.style.visibility = 'hidden'; }); clones.forEach((clone, i) => { setTimeout(() => { requestAnimationFrame(() => { const top = `${endRect.top - boardRect.top + 10}px`; const left = `${endRect.left - boardRect.left + (i * 20)}px`; clone.style.top = top; clone.style.left = left; }); }, i * 50); setTimeout(() => clone.remove(), 800 + (i*50)); }); }; animateHand(p1_cards, p2_area); animateHand(p2_cards, p1_area); }
     
-    // MODIFIED: Renders log to the modal content area
-    function renderGameLog(logHistory) {
-        if (!gameLogModalContent) return;
-        gameLogModalContent.innerHTML = ''; // Clear previous logs
-        if (!logHistory) return;
-        
-        // Render all logs (newest first as per server logic)
-        logHistory.forEach(msg => {
-            const entryDiv = document.createElement('div');
-            entryDiv.textContent = msg;
-            gameLogModalContent.appendChild(entryDiv); // Append to modal
-        });
-        // Scroll to top
-        gameLogModalContent.scrollTop = 0;
-    }
-
+    function renderGameLog(logHistory) { /* ... (unchanged, still populates modal) ... */ if (!gameLogModalContent) return; gameLogModalContent.innerHTML = ''; if (!logHistory) return; logHistory.forEach(msg => { const entryDiv = document.createElement('div'); entryDiv.textContent = msg; gameLogModalContent.appendChild(entryDiv); }); gameLogModalContent.scrollTop = 0; }
     function renderFinalScores(finalGameState) { /* ... (unchanged) ... */ const players = finalGameState.players; const numRounds = finalGameState.roundNumber; const table = document.createElement('table'); table.className = 'score-table final-table'; let headerHtml = '<thead><tr><th>Round</th>'; players.forEach(p => { headerHtml += `<th>${p.name}</th>`; }); headerHtml += '</tr></thead>'; let bodyHtml = '<tbody>'; for (let i = 0; i < numRounds; i++) { bodyHtml += `<tr><td>${i + 1}</td>`; players.forEach(p => { const score = p.scoresByRound[i] !== undefined ? p.scoresByRound[i] : '-'; bodyHtml += `<td>${score}</td>`; }); bodyHtml += '</tr>'; } bodyHtml += '</tbody>'; let footerHtml = '<tfoot><tr><td><strong>Total</strong></td>'; let lowestScore = Infinity; players.forEach(p => { if (p.status === 'Active' || p.status === 'Disconnected') { if (p.score < lowestScore) { lowestScore = p.score; } } footerHtml += `<td><strong>${p.score}</strong></td>`; }); footerHtml += '</tr></tfoot>'; table.innerHTML = headerHtml + bodyHtml + footerHtml; finalScoreTableContainer.innerHTML = ''; finalScoreTableContainer.appendChild(table); const winners = players.filter(p => (p.status === 'Active' || p.status === 'Disconnected') && p.score === lowestScore); const winnerNames = winners.map(w => w.name).join(' and '); finalWinnerMessage.textContent = `${winnerNames} win(s) the game!`; }
     
     function createSmallCardImage(card) { /* ... (unchanged) ... */ const cardDiv = document.createElement('div'); if (!card || !card.color || !card.value) { console.error("Attempted to create small card with invalid data:", card); cardDiv.className = 'final-card-img Black'; cardDiv.textContent = '?'; return cardDiv; } cardDiv.className = `final-card-img ${card.color}`; if (!isNaN(card.value)) { const numberSpan = document.createElement('span'); numberSpan.className = 'number-circle'; numberSpan.textContent = card.value; cardDiv.appendChild(numberSpan); } else { const actionSpan = document.createElement('span'); actionSpan.className = 'action-text'; actionSpan.innerHTML = card.value.replace(/\s/g, '<br>'); cardDiv.appendChild(actionSpan); } return cardDiv; }
@@ -419,7 +403,7 @@ window.addEventListener('DOMContentLoaded', () => {
     makeDraggable(document.getElementById('confirm-hard-reset-modal'));
     makeDraggable(document.getElementById('game-log-modal')); 
     
-    // *** MODIFIED: handleMoveAnnouncement ***
+    // *** MODIFIED: handleMoveAnnouncement (Added check for wild-draw-choice) ***
     function handleMoveAnnouncement(currentState, prevState) { 
         if (!prevState || !currentState || !currentState.gameLog || currentState.gameLog.length === 0) {
             return;
@@ -433,12 +417,6 @@ window.addEventListener('DOMContentLoaded', () => {
              return;
         }
 
-        // *** MODIFIED: REMOVED the check for modalLogs ***
-        // const modalLogs = ['played a Wild', 'played a Wild Draw Four', 'played a Wild Swap', 'played a Wild Pick Until'];
-        // if (modalLogs.some(logFragment => latestLog.includes(logFragment))) {
-        //     return; // A modal is coming, so no toast.
-        // }
-        
         // Keep the penalty check below
         if (latestLog.includes('penalty on')) {
              return; // The 'announce' event will handle this with showToast
@@ -451,32 +429,31 @@ window.addEventListener('DOMContentLoaded', () => {
 
         // Parse log for completed actions
         if (latestLog.includes('chose the color')) {
-            // "🎨 Player A chose the color Red."
             const match = latestLog.match(/🎨 (.+?) chose the color (.+?)\./);
             if (match) {
                  message = `${match[1]} chose ${match[2]}. Next: ${nextPlayerName}`;
             }
         } else if (latestLog.includes('played a')) {
-            // "› Player A played a Red 5." 
-            // Also catches "› Player A played a Black Wild Draw Four."
             const match = latestLog.match(/› (.+?) played a (.+?)\./);
             if(match) {
-                 // Format the card name nicely (e.g., "Black Wild Draw Four" -> "Wild Draw Four")
                  let cardName = match[2].replace('Black ', ''); 
                  message = `${match[1]} played ${cardName}. Next: ${nextPlayerName}`;
             }
         } else if (latestLog.includes('drew a card.')) {
-            message = `${latestLog.replace('› ', '').replace('.', '')}. Next: ${nextPlayerName}`;
+            // *** ADDED THIS CHECK ***
+            // Suppress toast if this draw triggered the wild choice modal
+            if (currentState.pendingAction?.type !== 'wild-draw-choice') {
+                 message = `${latestLog.replace('› ', '').replace('.', '')}. Next: ${nextPlayerName}`;
+            }
+            // *** END ADDED CHECK ***
         } else if (latestLog.includes('...and it was a playable')) {
             const match = latestLog.match(/\.\.\.and it was a playable (.+?)!/);
             if (match) {
                  message = `...and auto-played ${match[1]}! Next: ${nextPlayerName}`;
             }
         } else if (latestLog.includes('drew') && latestLog.includes('cards.')) {
-             // "› Player A drew 4 cards."
              message = `${latestLog.replace('› ', '').replace('.', '')}. Next: ${nextPlayerName}`;
         } else {
-            // Fallback for other simple logs
              message = latestLog.replace('› ', '').replace('📣 ', '');
         }
 
