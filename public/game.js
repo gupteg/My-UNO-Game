@@ -6,10 +6,9 @@ window.addEventListener('DOMContentLoaded', () => {
     let isGameOver = false;
     let countdownInterval = null;
     let playerIdToMarkAFK = null;
-    // window.expectingLobbyUpdate = false; // Flag no longer needed here
     
     let previousGameState = null; // For move announcement diff
-    let moveAnnouncementTimeout = null; // Timer for move announcement
+    let moveAnnouncementTimeout = null; // Timer for move announcement (unused now)
     let rainInterval = null; // Timer for rain animation
 
     // --- SCREEN & ELEMENT REFERENCES ---
@@ -44,7 +43,6 @@ window.addEventListener('DOMContentLoaded', () => {
     const finalScoreTableContainer = document.getElementById('final-score-table-container');
     const finalScoreOkBtn = document.getElementById('final-score-ok-btn');
     const invalidMoveCallout = document.getElementById('invalid-move-callout');
-    // const gameLogList = document.getElementById('game-log-list'); // REMOVED
     const toastNotification = document.getElementById('toast-notification'); // This is the BIG alert/move toast
     const actionBar = document.getElementById('action-bar');
     const arrangeHandBtn = document.getElementById('arrangeHandBtn');
@@ -72,7 +70,6 @@ window.addEventListener('DOMContentLoaded', () => {
     const confirmResetYesBtn = document.getElementById('confirm-reset-yes-btn');
     const confirmResetNoBtn = document.getElementById('confirm-reset-no-btn');
     const lobbyWaitMessage = document.getElementById('lobby-wait-message'); // Get wait message element
-    // NEW: Log Modal Elements
     const showLogBtn = document.getElementById('show-log-btn');
     const gameLogModal = document.getElementById('game-log-modal');
     const gameLogModalContent = document.getElementById('game-log-modal-content');
@@ -148,7 +145,6 @@ window.addEventListener('DOMContentLoaded', () => {
     showDiscardPileBtn.addEventListener('click', () => { if (!window.gameState) return; const lastTenDiscards = window.gameState.discardPile.slice(0, 10); discardPileList.innerHTML = ''; if (lastTenDiscards.length === 0) { discardPileList.innerHTML = '<p>The discard pile is empty.</p>'; } else { lastTenDiscards.forEach(item => { const discardItemDiv = document.createElement('div'); discardItemDiv.className = 'discard-item'; const playerP = document.createElement('p'); playerP.className = 'discard-item-player'; playerP.textContent = `Played by: ${item.playerName}`; if (item.card) { const cardEl = createCardElement(item.card, -1); discardItemDiv.appendChild(cardEl); discardItemDiv.appendChild(playerP); discardPileList.appendChild(discardItemDiv); } else { console.warn("Discard pile item missing card data:", item); } }); } discardPileModal.style.display = 'flex'; });
     discardPileOkBtn.addEventListener('click', () => { discardPileModal.style.display = 'none'; });
     discardWildsOkBtn.addEventListener('click', () => { discardWildsModal.style.display = 'none'; });
-    // NEW: Log Modal Listeners
     showLogBtn.addEventListener('click', () => {
         if (window.gameState && window.gameState.gameLog) {
             renderGameLog(window.gameState.gameLog); // Populate the modal
@@ -287,9 +283,8 @@ window.addEventListener('DOMContentLoaded', () => {
 
 
     // --- ALL DISPLAY AND HELPER FUNCTIONS ---
-    function renderLobby(currentLobbyPlayers) { /* ... (unchanged) ... */ const me = currentLobbyPlayers.find(p => p.playerId === myPersistentPlayerId); if (!me && sessionStorage.getItem('unoPlayerId')) { showToast("You may have been kicked or the session ended."); sessionStorage.removeItem('unoPlayerId'); sessionStorage.removeItem('unoPlayerName'); myPersistentPlayerId = null; setTimeout(() => { location.reload(); }, 1500); return; } if (!me) { console.error("Could not find player data in lobby."); joinScreen.style.display = 'block'; lobbyScreen.style.display = 'none'; gameBoard.style.display = 'none'; return; } joinScreen.style.display = 'none'; lobbyScreen.style.display = 'block'; gameBoard.style.display = 'none'; endOfRoundDiv.style.display = 'none'; finalScoreModal.style.display = 'none'; /* if (gameLogList) gameLogList.innerHTML = ''; REMOVED */ playerList.innerHTML = ''; let amIHost = me.isHost; currentLobbyPlayers.forEach(player => { if (!player.active) return; const playerItem = document.createElement('li'); const playerInfoDiv = document.createElement('div'); const statusDiv = document.createElement('div'); const nameSpan = document.createElement('span'); nameSpan.className = 'player-name'; let content = player.name; if (player.isHost) content += ' 👑 (Host)'; if (player.playerId === myPersistentPlayerId) content += ' (You)'; nameSpan.textContent = content; playerInfoDiv.appendChild(nameSpan); const readyStatusSpan = document.createElement('span'); readyStatusSpan.className = 'ready-status'; readyStatusSpan.innerHTML = player.isReady ? '✅ Ready' : '❌ Not Ready'; statusDiv.appendChild(readyStatusSpan); if (amIHost && player.playerId !== myPersistentPlayerId) { const kickBtn = document.createElement('button'); kickBtn.className = 'kick-btn'; kickBtn.textContent = 'Kick'; kickBtn.dataset.playerId = player.playerId; statusDiv.appendChild(kickBtn); } playerItem.appendChild(playerInfoDiv); playerItem.appendChild(statusDiv); playerList.appendChild(playerItem); }); if (amIHost) { playerLobbyActions.style.display = 'none'; hostLobbyActions.style.display = 'flex'; const activePlayers = currentLobbyPlayers.filter(p => p.active); const allReady = activePlayers.every(p => p.isReady); startGameBtn.disabled = !(activePlayers.length >= 2 && allReady); } else { playerLobbyActions.style.display = 'flex'; hostLobbyActions.style.display = 'none'; readyBtn.disabled = me.isReady; readyBtn.textContent = me.isReady ? 'Ready' : 'Set Ready'; } hostMessage.style.display = amIHost ? 'none' : 'block'; }
+    function renderLobby(currentLobbyPlayers) { /* ... (unchanged) ... */ const me = currentLobbyPlayers.find(p => p.playerId === myPersistentPlayerId); if (!me && sessionStorage.getItem('unoPlayerId')) { showToast("You may have been kicked or the session ended."); sessionStorage.removeItem('unoPlayerId'); sessionStorage.removeItem('unoPlayerName'); myPersistentPlayerId = null; setTimeout(() => { location.reload(); }, 1500); return; } if (!me) { console.error("Could not find player data in lobby."); joinScreen.style.display = 'block'; lobbyScreen.style.display = 'none'; gameBoard.style.display = 'none'; return; } joinScreen.style.display = 'none'; lobbyScreen.style.display = 'block'; gameBoard.style.display = 'none'; endOfRoundDiv.style.display = 'none'; finalScoreModal.style.display = 'none'; playerList.innerHTML = ''; let amIHost = me.isHost; currentLobbyPlayers.forEach(player => { if (!player.active) return; const playerItem = document.createElement('li'); const playerInfoDiv = document.createElement('div'); const statusDiv = document.createElement('div'); const nameSpan = document.createElement('span'); nameSpan.className = 'player-name'; let content = player.name; if (player.isHost) content += ' 👑 (Host)'; if (player.playerId === myPersistentPlayerId) content += ' (You)'; nameSpan.textContent = content; playerInfoDiv.appendChild(nameSpan); const readyStatusSpan = document.createElement('span'); readyStatusSpan.className = 'ready-status'; readyStatusSpan.innerHTML = player.isReady ? '✅ Ready' : '❌ Not Ready'; statusDiv.appendChild(readyStatusSpan); if (amIHost && player.playerId !== myPersistentPlayerId) { const kickBtn = document.createElement('button'); kickBtn.className = 'kick-btn'; kickBtn.textContent = 'Kick'; kickBtn.dataset.playerId = player.playerId; statusDiv.appendChild(kickBtn); } playerItem.appendChild(playerInfoDiv); playerItem.appendChild(statusDiv); playerList.appendChild(playerItem); }); if (amIHost) { playerLobbyActions.style.display = 'none'; hostLobbyActions.style.display = 'flex'; const activePlayers = currentLobbyPlayers.filter(p => p.active); const allReady = activePlayers.every(p => p.isReady); startGameBtn.disabled = !(activePlayers.length >= 2 && allReady); } else { playerLobbyActions.style.display = 'flex'; hostLobbyActions.style.display = 'none'; readyBtn.disabled = me.isReady; readyBtn.textContent = me.isReady ? 'Ready' : 'Set Ready'; } hostMessage.style.display = amIHost ? 'none' : 'block'; }
     
-    // This is the BIG toast for ALERTS and MOVES
     function showToast(message) { /* ... (unchanged) ... */ if (!toastNotification) return; toastNotification.textContent = message; toastNotification.classList.add('show'); setTimeout(() => { toastNotification.classList.remove('show'); }, 3000); }
     
     function showUnoAnnouncement(message) { /* ... (unchanged) ... */ unoAnnouncementText.textContent = message; if (message.length > 10) { unoAnnouncementText.style.fontSize = '8vw'; } else { unoAnnouncementText.style.fontSize = '15vw'; } unoAnnouncementOverlay.classList.add('show'); setTimeout(() => { unoAnnouncementOverlay.classList.remove('show'); }, 1900); }
@@ -422,10 +417,73 @@ window.addEventListener('DOMContentLoaded', () => {
     function getDragAfterElement(container, x) { /* ... (unchanged) ... */ const draggableElements = [...container.querySelectorAll('.card:not(.dragging)')]; return draggableElements.reduce((closest, child) => { const box = child.getBoundingClientRect(); const offset = x - box.left - box.width / 2; if (offset < 0 && offset > closest.offset) { return { offset: offset, element: child }; } else { return closest; } }, { offset: Number.NEGATIVE_INFINITY }).element; }
     makeDraggable(document.getElementById('color-picker-modal')); makeDraggable(document.getElementById('drawn-wild-modal')); makeDraggable(document.getElementById('pick-until-modal')); makeDraggable(document.getElementById('swap-modal')); makeDraggable(document.getElementById('deal-choice-modal')); makeDraggable(document.getElementById('confirm-end-game-modal')); makeDraggable(document.getElementById('end-of-round-div')); makeDraggable(document.getElementById('final-score-modal')); makeDraggable(document.getElementById('afk-notification-modal')); makeDraggable(document.getElementById('discard-pile-modal')); makeDraggable(document.getElementById('confirm-afk-modal')); makeDraggable(document.getElementById('discard-wilds-modal'));
     makeDraggable(document.getElementById('confirm-hard-reset-modal'));
-    // NEW: Make log modal draggable
     makeDraggable(document.getElementById('game-log-modal')); 
     
-    function handleMoveAnnouncement(currentState, prevState) { /* ... (unchanged, still calls showToast) ... */ if (!prevState || !currentState || !currentState.gameLog || currentState.gameLog.length === 0) { return; } const latestLog = currentState.gameLog[0]; const previousLog = prevState.gameLog[0]; if (latestLog === previousLog || latestLog.includes('Round ') || latestLog.includes('🏁') || latestLog.includes('Game initialized.')) { return; } const modalLogs = ['played a Wild', 'played a Wild Draw Four', 'played a Wild Swap', 'played a Wild Pick Until']; if (modalLogs.some(logFragment => latestLog.includes(logFragment))) { return; } if (latestLog.includes('penalty on')) { return; } let message = ""; const nextPlayer = currentState.players[currentState.currentPlayerIndex]; const nextPlayerName = nextPlayer ? nextPlayer.name : "Unknown"; if (latestLog.includes('chose the color')) { const match = latestLog.match(/🎨 (.+?) chose the color (.+?)\./); if (match) { message = `${match[1]} chose ${match[2]}. Next: ${nextPlayerName}`; } } else if (latestLog.includes('played a')) { const match = latestLog.match(/› (.+?) played a (.+?)\./); if(match) { message = `${match[1]} played ${match[2]}. Next: ${nextPlayerName}`; } } else if (latestLog.includes('drew a card.')) { message = `${latestLog.replace('› ', '').replace('.', '')}. Next: ${nextPlayerName}`; } else if (latestLog.includes('...and it was a playable')) { const match = latestLog.match(/\.\.\.and it was a playable (.+?)!/); if (match) { message = `...and auto-played ${match[1]}! Next: ${nextPlayerName}`; } } else if (latestLog.includes('drew') && latestLog.includes('cards.')) { message = `${latestLog.replace('› ', '').replace('.', '')}. Next: ${nextPlayerName}`; } else { message = latestLog.replace('› ', '').replace('📣 ', ''); } if (message) { showToast(message); } }
+    // *** MODIFIED: handleMoveAnnouncement ***
+    function handleMoveAnnouncement(currentState, prevState) { 
+        if (!prevState || !currentState || !currentState.gameLog || currentState.gameLog.length === 0) {
+            return;
+        }
+
+        const latestLog = currentState.gameLog[0];
+        const previousLog = prevState.gameLog[0];
+
+        // Don't show if log hasn't changed or is a non-move
+        if (latestLog === previousLog || latestLog.includes('Round ') || latestLog.includes('🏁') || latestLog.includes('Game initialized.')) {
+             return;
+        }
+
+        // *** MODIFIED: REMOVED the check for modalLogs ***
+        // const modalLogs = ['played a Wild', 'played a Wild Draw Four', 'played a Wild Swap', 'played a Wild Pick Until'];
+        // if (modalLogs.some(logFragment => latestLog.includes(logFragment))) {
+        //     return; // A modal is coming, so no toast.
+        // }
+        
+        // Keep the penalty check below
+        if (latestLog.includes('penalty on')) {
+             return; // The 'announce' event will handle this with showToast
+        }
+
+
+        let message = "";
+        const nextPlayer = currentState.players[currentState.currentPlayerIndex];
+        const nextPlayerName = nextPlayer ? nextPlayer.name : "Unknown";
+
+        // Parse log for completed actions
+        if (latestLog.includes('chose the color')) {
+            // "🎨 Player A chose the color Red."
+            const match = latestLog.match(/🎨 (.+?) chose the color (.+?)\./);
+            if (match) {
+                 message = `${match[1]} chose ${match[2]}. Next: ${nextPlayerName}`;
+            }
+        } else if (latestLog.includes('played a')) {
+            // "› Player A played a Red 5." 
+            // Also catches "› Player A played a Black Wild Draw Four."
+            const match = latestLog.match(/› (.+?) played a (.+?)\./);
+            if(match) {
+                 // Format the card name nicely (e.g., "Black Wild Draw Four" -> "Wild Draw Four")
+                 let cardName = match[2].replace('Black ', ''); 
+                 message = `${match[1]} played ${cardName}. Next: ${nextPlayerName}`;
+            }
+        } else if (latestLog.includes('drew a card.')) {
+            message = `${latestLog.replace('› ', '').replace('.', '')}. Next: ${nextPlayerName}`;
+        } else if (latestLog.includes('...and it was a playable')) {
+            const match = latestLog.match(/\.\.\.and it was a playable (.+?)!/);
+            if (match) {
+                 message = `...and auto-played ${match[1]}! Next: ${nextPlayerName}`;
+            }
+        } else if (latestLog.includes('drew') && latestLog.includes('cards.')) {
+             // "› Player A drew 4 cards."
+             message = `${latestLog.replace('› ', '').replace('.', '')}. Next: ${nextPlayerName}`;
+        } else {
+            // Fallback for other simple logs
+             message = latestLog.replace('› ', '').replace('📣 ', '');
+        }
+
+        if (message) {
+            showToast(message); // Call the main toast function
+        }
+    }
     
     function showWinnerAnnouncement(mainText, subText, duration) { /* ... (unchanged) ... */ const overlay = document.getElementById('winner-announcement-overlay'); const textElement = document.getElementById('winner-announcement-text'); const subtextElement = document.getElementById('winner-announcement-subtext'); if (!overlay || !textElement || !subtextElement) return; textElement.textContent = mainText; subtextElement.textContent = subText || ''; overlay.classList.remove('hidden'); startRainAnimation(); if (duration) { setTimeout(() => { hideWinnerAnnouncement(); }, duration); } }
     function hideWinnerAnnouncement() { /* ... (unchanged) ... */ const overlay = document.getElementById('winner-announcement-overlay'); if (overlay) overlay.classList.add('hidden'); stopRainAnimation(); }
