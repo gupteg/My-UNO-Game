@@ -58,33 +58,10 @@ body {
 #game-board { height: 100%; display: flex; gap: 10px; position: relative; padding-top: 45px; box-sizing: border-box; }
 #action-bar { position: absolute; top: 0; left: 0; width: 100%; background-color: rgba(0, 0, 0, 0.6); color: #ffc107; text-align: center; padding: 8px 0; font-size: 1.2em; font-weight: bold; z-index: 10; box-sizing: border-box; text-shadow: 1px 1px 2px black; }
 
-/* *** NEW: SOH-style Move Announcement Banner *** */
-#move-announcement-banner {
-    position: absolute;
-    top: 55px; /* Below the main action bar */
-    left: 50%;
-    transform: translateX(-50%);
-    background-color: rgba(0, 0, 0, 0.85);
-    color: #ffc107;
-    padding: 8px 15px;
-    border-radius: 8px;
-    font-size: 1.1em;
-    font-weight: bold;
-    z-index: 9;
-    opacity: 0;
-    transition: opacity 0.5s ease-in-out, top 0.5s ease-in-out;
-    pointer-events: none;
-    white-space: nowrap;
-    border: 2px solid #ffc107;
-}
-#move-announcement-banner.visible {
-    opacity: 1;
-    top: 65px;
-}
+/* *** CSS for #move-announcement-banner has been REMOVED *** */
 .hidden {
     display: none !important;
 }
-/* *** END NEW *** */
 
 #left-column { flex: 3; display: flex; flex-direction: column; gap: 15px; overflow-y: auto; padding-right: 10px; }
 
@@ -208,7 +185,7 @@ body {
 #next-round-btn, #confirm-end-yes-btn, #final-score-ok-btn, #next-round-ok-btn, #im-back-btn, #discard-pile-ok-btn, #confirm-afk-yes-btn, #discard-wilds-ok-btn { background-color: #55aa55; border-color: #448844; color: white; }
 #end-game-round-btn, #confirm-end-no-btn, #confirm-afk-no-btn, #confirm-reset-no-btn { background-color: #ff5555; border-color: #cc4444; color: white; }
 
-/* This is your ORIGINAL toast, used for ALERTS */
+/* This is your ORIGINAL toast, used for ALERTS and now MOVES */
 #toast-notification {
   position: fixed;
   bottom: 150px;
@@ -272,9 +249,7 @@ body {
     /* Original Toast (Alert) */
     #toast-notification { padding: 12px 20px; font-size: 1.6em; bottom: 180px; max-width: 90%; white-space: normal; } 
     
-    /* New Toast (Move) */
-    #move-announcement-banner { font-size: 1em; top: 45px; max-width: 90%; }
-    #move-announcement-banner.visible { top: 55px; }
+    /* CSS for #move-announcement-banner has been REMOVED */
 
     #direction-arrow { height: 150px; width: 40px; } 
 }
