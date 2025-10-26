@@ -403,15 +403,14 @@ window.addEventListener('DOMContentLoaded', () => {
     makeDraggable(document.getElementById('confirm-hard-reset-modal'));
     makeDraggable(document.getElementById('game-log-modal')); 
     
-    // *** MODIFIED: handleMoveAnnouncement (Refined check v4 for wild-draw-choice) ***
+    // *** MODIFIED: handleMoveAnnouncement (Simplified and added UNO penalty) ***
     function handleMoveAnnouncement(currentState, prevState) { 
-        // Ensure previousGameState exists before proceeding
         if (!previousGameState || !currentState || !currentState.gameLog || currentState.gameLog.length === 0) {
             return;
         }
 
         const latestLog = currentState.gameLog[0];
-        const previousLog = previousGameState.gameLog[0]; // Use the stored previousGameState
+        const previousLog = previousGameState.gameLog[0];
 
         // Don't show if log hasn't changed or is a non-move
         if (latestLog === previousLog || latestLog.includes('Round ') || latestLog.includes('🏁') || latestLog.includes('Game initialized.')) {
@@ -428,8 +427,15 @@ window.addEventListener('DOMContentLoaded', () => {
         const nextPlayer = currentState.players[currentState.currentPlayerIndex];
         const nextPlayerName = nextPlayer ? nextPlayer.name : "Unknown";
 
-        // Parse log for completed actions
-        if (latestLog.includes('chose the color')) {
+        // --- NEW: UNO Penalty Announcement ---
+        if (latestLog.includes(' penalty on ') && latestLog.includes(' for not calling UNO.')) {
+            const match = latestLog.match(/ penalty on (.*?) for not calling UNO/);
+            if (match) {
+                 const penalizedPlayerName = match[1];
+                 message = `🚨 Penalty on ${penalizedPlayerName} for not calling UNO! Next: ${nextPlayerName}`;
+            }
+        // --- END NEW ---
+        } else if (latestLog.includes('chose the color')) {
             const match = latestLog.match(/🎨 (.+?) chose the color (.+?)\./);
             if (match) {
                  message = `${match[1]} chose ${match[2]}. Next: ${nextPlayerName}`;
@@ -440,23 +446,20 @@ window.addEventListener('DOMContentLoaded', () => {
                  let cardName = match[2].replace('Black ', ''); 
                  message = `${match[1]} played ${cardName}. Next: ${nextPlayerName}`;
             }
-        } else if (latestLog.includes('drew a card.') || latestLog.includes('chose to keep the drawn Wild card.')) { // Check both potential logs
-            // *** REVISED CHECK (v4) ***
-            const wasWildChoicePending = previousGameState?.pendingAction?.type === 'wild-draw-choice'; // Use previousGameState here
-            const keptWildLog = latestLog.includes('chose to keep the drawn Wild card.');
+        } else if (latestLog.includes('drew a card.')) {
+            // *** SIMPLIFIED LOGIC ***
+            // Suppress toast if the draw triggered the wild choice modal
+            const wasWildChoicePending = previousGameState?.pendingAction?.type === 'wild-draw-choice';
 
-            // Generate generic "drew" message for normal non-playable draws OR for *keeping* a wild.
-            // Suppress only for the initial draw that triggers the wild choice modal.
-            if ((!wasWildChoicePending && !keptWildLog) || keptWildLog) {
-                 // Generate the standard "drew a card" message regardless of the specific log text ("drew" or "kept")
-                 // Extract player name reliably from either log type
-                 const drewMatch = latestLog.match(/› (.*?)(?: drew a card| chose to keep)/);
-                 const playerName = drewMatch ? drewMatch[1] : "Someone"; // Fallback name if regex fails
+            if (!wasWildChoicePending) {
+                 const drewMatch = latestLog.match(/› (.*?)(?: drew a card|\. Next)/);
+                 const playerName = drewMatch ? drewMatch[1] : "Someone";
+                 // This handles normal non-playable draws AND the new server log for "kept wild"
                  message = `${playerName} drew a card. Next: ${nextPlayerName}`;
             }
-            // If wasWildChoicePending is true AND keptWildLog is false (initial wild draw), message remains empty, suppressing the reveal.
+            // If wasWildChoicePending is true, message remains empty, suppressing the reveal.
+            // *** END SIMPLIFIED LOGIC ***
 
-            // *** END REVISED CHECK (v4) ***
         } else if (latestLog.includes('...and it was a playable')) { // Auto-play non-wild
              const match = latestLog.match(/\.\.\.and it was a playable (.+?)!/);
              if (match) {
