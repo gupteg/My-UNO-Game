@@ -6,7 +6,7 @@ window.addEventListener('DOMContentLoaded', () => {
     let isGameOver = false;
     let countdownInterval = null;
     let playerIdToMarkAFK = null;
-    
+
     let previousGameState = null; // For move announcement diff
     let rainInterval = null; // Timer for rain animation
 
@@ -403,20 +403,21 @@ window.addEventListener('DOMContentLoaded', () => {
     makeDraggable(document.getElementById('confirm-hard-reset-modal'));
     makeDraggable(document.getElementById('game-log-modal')); 
     
-    // *** MODIFIED: handleMoveAnnouncement (Added check for wild-draw-choice) ***
+    // *** MODIFIED: handleMoveAnnouncement (Refined check v4 for wild-draw-choice) ***
     function handleMoveAnnouncement(currentState, prevState) { 
-        if (!prevState || !currentState || !currentState.gameLog || currentState.gameLog.length === 0) {
+        // Ensure previousGameState exists before proceeding
+        if (!previousGameState || !currentState || !currentState.gameLog || currentState.gameLog.length === 0) {
             return;
         }
 
         const latestLog = currentState.gameLog[0];
-        const previousLog = prevState.gameLog[0];
+        const previousLog = previousGameState.gameLog[0]; // Use the stored previousGameState
 
         // Don't show if log hasn't changed or is a non-move
         if (latestLog === previousLog || latestLog.includes('Round ') || latestLog.includes('🏁') || latestLog.includes('Game initialized.')) {
              return;
         }
-
+        
         // Keep the penalty check below
         if (latestLog.includes('penalty on')) {
              return; // The 'announce' event will handle this with showToast
@@ -439,18 +440,28 @@ window.addEventListener('DOMContentLoaded', () => {
                  let cardName = match[2].replace('Black ', ''); 
                  message = `${match[1]} played ${cardName}. Next: ${nextPlayerName}`;
             }
-        } else if (latestLog.includes('drew a card.')) {
-            // *** ADDED THIS CHECK ***
-            // Suppress toast if this draw triggered the wild choice modal
-            if (currentState.pendingAction?.type !== 'wild-draw-choice') {
-                 message = `${latestLog.replace('› ', '').replace('.', '')}. Next: ${nextPlayerName}`;
+        } else if (latestLog.includes('drew a card.') || latestLog.includes('chose to keep the drawn Wild card.')) { // Check both potential logs
+            // *** REVISED CHECK (v4) ***
+            const wasWildChoicePending = previousGameState?.pendingAction?.type === 'wild-draw-choice'; // Use previousGameState here
+            const keptWildLog = latestLog.includes('chose to keep the drawn Wild card.');
+
+            // Generate generic "drew" message for normal non-playable draws OR for *keeping* a wild.
+            // Suppress only for the initial draw that triggers the wild choice modal.
+            if ((!wasWildChoicePending && !keptWildLog) || keptWildLog) {
+                 // Generate the standard "drew a card" message regardless of the specific log text ("drew" or "kept")
+                 // Extract player name reliably from either log type
+                 const drewMatch = latestLog.match(/› (.*?)(?: drew a card| chose to keep)/);
+                 const playerName = drewMatch ? drewMatch[1] : "Someone"; // Fallback name if regex fails
+                 message = `${playerName} drew a card. Next: ${nextPlayerName}`;
             }
-            // *** END ADDED CHECK ***
-        } else if (latestLog.includes('...and it was a playable')) {
-            const match = latestLog.match(/\.\.\.and it was a playable (.+?)!/);
-            if (match) {
+            // If wasWildChoicePending is true AND keptWildLog is false (initial wild draw), message remains empty, suppressing the reveal.
+
+            // *** END REVISED CHECK (v4) ***
+        } else if (latestLog.includes('...and it was a playable')) { // Auto-play non-wild
+             const match = latestLog.match(/\.\.\.and it was a playable (.+?)!/);
+             if (match) {
                  message = `...and auto-played ${match[1]}! Next: ${nextPlayerName}`;
-            }
+             }
         } else if (latestLog.includes('drew') && latestLog.includes('cards.')) {
              message = `${latestLog.replace('› ', '').replace('.', '')}. Next: ${nextPlayerName}`;
         } else {
