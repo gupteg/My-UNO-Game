@@ -347,7 +347,7 @@ io.on('connection', (socket) => {
     }
   });
   
-  // --- *** (drawCard logic remains modified from previous change) *** ---
+  // --- *** drawCard handler with premature log removed and correct log added *** ---
   socket.on('drawCard', () => {
     if (!gameState || !['Playing'].includes(gameState.phase) || gameState.isPaused) return;
     const playerIndex = gameState.players.findIndex(p => p.socketId === socket.id);
@@ -355,7 +355,7 @@ io.on('connection', (socket) => {
         const player = gameState.players[playerIndex];
         const topCard = gameState.discardPile[0].card;
 
-        // 1. Check for drawPenalty FIRST, as it takes precedence.
+        // 1. Check for drawPenalty FIRST
         if (gameState.drawPenalty > 0) {
             const penalty = gameState.drawPenalty;
             for (let i = 0; i < penalty; i++) {
@@ -365,26 +365,19 @@ io.on('connection', (socket) => {
             addLog(`› ${player.name} drew ${penalty} cards.`);
             player.unoState = 'safe';
             gameState.drawPenalty = 0;
-
-            // 2. ALSO clear any lingering pickUntilState for this player.
             if (gameState.pickUntilState?.active && gameState.pickUntilState.targetPlayerIndex === playerIndex) {
                 addLog(`...and the 'Pick Until ${gameState.pickUntilState.targetColor}' action was cancelled.`);
                 gameState.pickUntilState = null;
             }
-
             if (gameState.winnerOnHold.length > 0) {
                 const heldWinners = gameState.players.filter(p => gameState.winnerOnHold.includes(p.playerId));
-                if (!heldWinners.some(w => w.playerId === player.playerId)) {
-                    handleEndOfRound(heldWinners);
-                    return;
-                } else {
-                    gameState.winnerOnHold = [];
-                }
+                if (!heldWinners.some(w => w.playerId === player.playerId)) { handleEndOfRound(heldWinners); return; }
+                else { gameState.winnerOnHold = []; }
             }
             advanceTurn();
             gameState.phase = 'Playing';
 
-        // 3. Check for pickUntilState SECOND (now as 'else if').
+        // 2. Check for pickUntilState SECOND
         } else if (gameState.pickUntilState?.active && gameState.pickUntilState.targetPlayerIndex === playerIndex) {
             if (gameState.drawPile.length > 0) {
                 const drawnCard = gameState.drawPile.shift();
@@ -401,19 +394,15 @@ io.on('connection', (socket) => {
                     gameState.pickUntilState = null; // State is resolved
                     if (player.hand.length === 0) {
                         const heldWinners = gameState.players.filter(p => gameState.winnerOnHold.includes(p.playerId));
-                        handleEndOfRound([player, ...heldWinners]);
-                        return;
+                        handleEndOfRound([player, ...heldWinners]); return;
                     }
                     if (gameState.winnerOnHold.includes(pickUntilChooserId)) {
                         const heldWinners = gameState.players.filter(p => gameState.winnerOnHold.includes(p.playerId));
-                        handleEndOfRound(heldWinners);
-                        return;
+                        handleEndOfRound(heldWinners); return;
                     }
                     applyCardEffect(drawnCard);
                     const numActivePlayers = gameState.players.filter(p => p.status === 'Active').length;
-                    if (drawnCard.value === 'Skip' || (drawnCard.value === 'Reverse' && numActivePlayers === 2)) {
-                        advanceTurn();
-                    }
+                    if (drawnCard.value === 'Skip' || (drawnCard.value === 'Reverse' && numActivePlayers === 2)) { advanceTurn(); }
                     advanceTurn();
                     gameState.phase = 'Playing';
                 } else {
@@ -426,7 +415,7 @@ io.on('connection', (socket) => {
                 gameState.phase = 'Playing';
             }
         
-        // 4. This is the original 'else' block for a normal draw.
+        // 3. Normal draw
         } else {
             if (checkIfPlayerMustPlay(player, topCard, gameState.activeColor)) {
                 io.to(socket.id).emit('announce', 'You have a playable card in your hand. You must play it.');
@@ -435,41 +424,35 @@ io.on('connection', (socket) => {
             if (gameState.drawPile.length > 0) {
                 const drawnCard = gameState.drawPile.shift();
                 io.emit('animateDraw', { playerId: player.playerId, count: 1 });
-                addLog(`› ${player.name} drew a card.`);
+                
+                // *** Premature log removed from here ***
+
                 if (isMoveValid(drawnCard, topCard, gameState.activeColor, 0)) {
                     if (drawnCard.color === 'Black') {
                         player.hand.push(drawnCard);
                         const cardIndex = player.hand.length - 1;
                         io.to(socket.id).emit('updateGameState', gameState);
                         io.to(socket.id).emit('drawnWildCard', { cardIndex, drawnCard });
-                        return; // Wait for player to choose 'play' or 'keep'
+                        return; // Wait for player choice
                     } else {
-                        // --- *** Check for auto-UNO on non-wild draw (from previous change) *** ---
                         const willAutoUno = player.hand.length === 1;
-                        // --- *** END *** ---
-
                         gameState.discardPile.unshift({ card: drawnCard, playerName: player.name });
                         gameState.activeColor = drawnCard.color;
                         applyCardEffect(drawnCard);
                         io.to(socket.id).emit('announce', `You drew a playable card (${drawnCard.value} ${drawnCard.color}) and it was played for you.`);
-                        addLog(`...and it was a playable ${drawnCard.color} ${drawnCard.value}!`);
+                        addLog(`...and it was a playable ${drawnCard.color} ${drawnCard.value}!`); // Log for auto-play
                         player.unoState = 'safe';
-
-                        // --- *** Emit auto-UNO if condition met (from previous change) *** ---
-                        if (willAutoUno) {
-                            io.emit('unoCalled', { playerName: player.name });
-                        }
-                        // --- *** END *** ---
-
+                        if (willAutoUno) { io.emit('unoCalled', { playerName: player.name }); }
                         const numActivePlayers = gameState.players.filter(p => p.status === 'Active').length;
-                        if (drawnCard.value === 'Skip' || (drawnCard.value === 'Reverse' && numActivePlayers === 2)) {
-                            advanceTurn();
-                        }
+                        if (drawnCard.value === 'Skip' || (drawnCard.value === 'Reverse' && numActivePlayers === 2)) { advanceTurn(); }
                         advanceTurn();
                         gameState.phase = 'Playing';
                     }
                 } else {
+                    // Card is NOT playable
                     player.hand.push(drawnCard);
+                    // *** ADD LOG HERE for non-playable draw ***
+                    addLog(`› ${player.name} drew a card.`); 
                     player.unoState = 'safe';
                     advanceTurn();
                     gameState.phase = 'Playing';
@@ -487,7 +470,7 @@ io.on('connection', (socket) => {
         }
     }
   });
-  // --- *** END MODIFICATION *** ---
+  // --- *** END drawCard modification *** ---
 
   socket.on('choosePlayDrawnWild', ({ play, cardIndex }) => { 
       if (!gameState || !['Playing'].includes(gameState.phase) || gameState.isPaused) return; 
@@ -501,9 +484,8 @@ io.on('connection', (socket) => {
           gameState.phase = 'Playing'; 
           handleCardPlay(playerIndex, cardIndex); 
       } else { 
-          // *** MODIFIED: Change log to generic 'drew a card' for secrecy ***
-          addLog(`› ${player.name} drew a card.`); // CHANGED FROM 'chose to keep...'
-          // *** END MODIFICATION ***
+          // *** Log is generic 'drew a card' for secrecy (from previous change) ***
+          addLog(`› ${player.name} drew a card.`); 
           advanceTurn(); 
           gameState.phase = 'Playing'; 
       } 
