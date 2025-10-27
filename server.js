@@ -188,9 +188,8 @@ function handleCardPlay(playerIndex, cardIndex) {
             if (gameState.drawPile.length > 0) player.hand.push(gameState.drawPile.shift()); 
             player.unoState = 'safe'; 
             
-            // *** MODIFIED: Remove private announcement, rely on log/client-side toast ***
-            // io.to(player.socketId).emit('announce', 'Penalty! You forgot to call UNO.'); // REMOVED
-            addLog(` penalty on ${player.name} for not calling UNO.`); 
+            // *** MODIFIED: Add "🚨" marker for universal announcement ***
+            addLog(`🚨 Penalty on ${player.name} for not calling UNO.`); 
             
             io.emit('animateDraw', { playerId: player.playerId, count: 2 }); 
         } else if (player.hand.length === 1 && player.unoState === 'declared') { 
