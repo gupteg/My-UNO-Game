@@ -403,11 +403,18 @@ window.addEventListener('DOMContentLoaded', () => {
     makeDraggable(document.getElementById('confirm-hard-reset-modal'));
     makeDraggable(document.getElementById('game-log-modal')); 
     
-    // *** MODIFIED: handleMoveAnnouncement (Final fix for UNO penalty and simplified logic) ***
+    // *** MODIFIED: handleMoveAnnouncement (Final fix + Added Disconnected check) ***
     function handleMoveAnnouncement(currentState, prevState) { 
         if (!previousGameState || !currentState || !currentState.gameLog || currentState.gameLog.length === 0) {
             return;
         }
+
+        // *** ADDED: Check for Removed or Disconnected status ***
+        const me = currentState.players.find(p => p.playerId === myPersistentPlayerId);
+        if (me && (me.status === 'Removed' || me.status === 'Disconnected')) {
+            return; // Don't show toasts if removed OR disconnected
+        }
+        // *** END ADDED ***
 
         const latestLog = currentState.gameLog[0];
         const previousLog = previousGameState.gameLog[0];
@@ -418,7 +425,7 @@ window.addEventListener('DOMContentLoaded', () => {
         }
         
         // 2. UNO PENALTY (Highest Priority Announcement)
-        if (latestLog.includes('🚨 Penalty on ') && latestLog.includes(' for not calling UNO.')) {
+        if (latestLog.startsWith('🚨 Penalty on ') && latestLog.includes(' for not calling UNO.')) { // Check prefix
             const match = latestLog.match(/🚨 Penalty on (.*?) for not calling UNO/);
             const nextPlayer = currentState.players[currentState.currentPlayerIndex];
             const nextPlayerName = nextPlayer ? nextPlayer.name : "Unknown";
@@ -426,15 +433,14 @@ window.addEventListener('DOMContentLoaded', () => {
                  const penalizedPlayerName = match[1];
                  const message = `🚨 Penalty on ${penalizedPlayerName} for not calling UNO! Next: ${nextPlayerName}`;
                  showToast(message); 
-                 return;
+                 return; // Handled, exit early
             }
         }
         
         // 3. Keep the non-toast penalty check below (for Draw Penalty / Announce events)
-        if (latestLog.includes('penalty on')) {
+        if (latestLog.includes('penalty on')) { // This catches server-side draw penalties from 'announce'
              return; 
         }
-
 
         let message = "";
         const nextPlayer = currentState.players[currentState.currentPlayerIndex];
@@ -453,7 +459,7 @@ window.addEventListener('DOMContentLoaded', () => {
                  message = `${match[1]} played ${cardName}. Next: ${nextPlayerName}`;
             }
         } else if (latestLog.includes('drew a card.')) {
-            // *** SIMPLIFIED LOGIC ***
+            // *** SIMPLIFIED LOGIC (v4) ***
             // Suppress toast if the draw triggered the wild choice modal (based on previous state's pending action)
             const wasWildChoicePending = previousGameState?.pendingAction?.type === 'wild-draw-choice';
 
@@ -473,7 +479,8 @@ window.addEventListener('DOMContentLoaded', () => {
         } else if (latestLog.includes('drew') && latestLog.includes('cards.')) {
              message = `${latestLog.replace('› ', '').replace('.', '')}. Next: ${nextPlayerName}`;
         } else {
-             message = latestLog.replace('› ', '').replace('📣 ', '');
+             // General fallback, remove markers
+             message = latestLog.replace(/^› |^📣 |^🎨 |^✨ |^🤝 |^🌪️ |^🚨 / , '');
         }
 
         if (message) {
