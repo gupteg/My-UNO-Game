@@ -114,51 +114,236 @@ body {
 /* --- *** END MODIFICATION *** --- */
 
 #unoBtn { width: 120px; height: 120px; border-radius: 50%; border-color: #333; border-width: 3px; font-weight: bold; font-size: 32px; box-shadow: 0 0 10px rgba(0,0,0,0.5); color: white; text-shadow: 1px 1px 2px black; transition: all 0.3s ease; }
-.modal { position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: flex-start; padding-top: 10vh; pointer-events: none; }
-.modal-content { background-color: rgba(40, 40, 40, 0.95); color: white; border: 2px solid #ffc107; box-shadow: 0 0 30px rgba(255, 193, 7, 0.5); padding: 20px; border-radius: 10px; text-align: center; max-width: 90%; pointer-events: auto; }
-.modal-content h3, .modal-content h2, .modal-content p { cursor: move; user-select: none; }
-.modal-content h2, .modal-content h3 { color: #ffc107; text-shadow: 1px 1px 2px black; }
+
+/* --- *** MODIFICATION: New 7oH Modal Styles *** --- */
+.modal { 
+    position: fixed; 
+    z-index: 100; 
+    left: 0; 
+    top: 0; 
+    width: 100%; 
+    height: 100%; 
+    background-color: rgba(0,0,0,0.6); 
+    display: flex; 
+    justify-content: center; 
+    align-items: center; /* Center vertically */
+    pointer-events: none; 
+}
+.modal-content { 
+    background-color: #D2B48C; /* --parchment-bg */
+    color: #4a2c2a; /* --dark-text */
+    border: 5px solid #8c5b4f; /* --teak-light */
+    box-shadow: 0 5px 20px rgba(0,0,0,0.5);
+    padding: 20px; 
+    border-radius: 15px; 
+    text-align: center; 
+    max-width: 90%; 
+    width: auto; /* Auto width */
+    max-width: 600px; /* Max width for score tables */
+    pointer-events: auto; 
+    display: flex;
+    flex-direction: column;
+    max-height: 80vh; /* Allow modal to scroll */
+}
+/* Specific modals from UNO that use the dark style */
+#color-picker-modal .modal-content,
+#pick-until-modal .modal-content,
+#swap-modal .modal-content,
+#drawn-wild-modal .modal-content,
+#deal-choice-modal .modal-content,
+#confirm-end-game-modal .modal-content,
+#confirm-hard-reset-modal .modal-content,
+#afk-notification-modal .modal-content,
+#discard-pile-modal .modal-content,
+#confirm-afk-modal .modal-content,
+#discard-wilds-modal .modal-content,
+#game-log-modal .modal-content {
+    background-color: rgba(40, 40, 40, 0.95);
+    color: white;
+    border: 2px solid #ffc107;
+    box-shadow: 0 0 30px rgba(255, 193, 7, 0.5);
+    max-width: 90%;
+    width: auto; /* Reset width for non-scoreboard modals */
+}
+#discard-wilds-modal .modal-content.wide {
+    max-width: 800px;
+}
+/* Ensure headers are draggable */
+.modal-content h3, .modal-content h2, .modal-content p { 
+    cursor: move; 
+    user-select: none; 
+}
+/* Headers in dark modals */
+#color-picker-modal .modal-content h3,
+#pick-until-modal .modal-content h3,
+#swap-modal .modal-content h3,
+#drawn-wild-modal .modal-content h3,
+#deal-choice-modal .modal-content h3,
+#confirm-end-game-modal .modal-content h3,
+#afk-notification-modal .modal-content h3,
+#discard-pile-modal .modal-content h3,
+#confirm-afk-modal .modal-content h3,
+#discard-wilds-modal .modal-content h3,
+#game-log-modal .modal-content h3 {
+    color: #ffc107;
+    text-shadow: 1px 1px 2px black;
+}
+/* Headers in new parchment modals (scoreboards) */
+#end-of-round-div .modal-content h2,
+#final-score-modal .modal-content h2 {
+    color: #4a2c2a; /* --dark-text */
+    text-shadow: none;
+    margin-top: 0;
+}
+.modal-scrollable-content {
+    overflow-y: auto;
+    padding: 15px 5px 15px 0;
+    margin-top: 10px;
+    margin-bottom: 10px;
+    min-height: 100px;
+}
+/* --- *** END New Modal Styles *** --- */
+
+
+/* --- *** MODIFICATION: New Uniform Score Table Styles *** --- */
+.uniform-score-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    font-size: 0.9em;
+    color: #4a2c2a; /* --dark-text */
+    background-color: #D2B48C; /* --parchment-bg */
+}
+.uniform-score-table th, 
+.uniform-score-table td {
+    border: 1px solid #8c5b4f; /* --teak-light */
+    padding: 8px 12px;
+    text-align: left;
+}
+.uniform-score-table th {
+    background-color: #8c5b4f; /* --teak-light */
+    color: #f5f5dc; /* --light-text */
+}
+.uniform-score-table tbody tr:nth-child(even) {
+    background-color: rgba(0,0,0,0.05); /* Subtle stripe */
+}
+.uniform-score-table tfoot td {
+    background-color: rgba(0,0,0,0.1);
+    font-weight: bold;
+    border-top: 2px solid #8c5b4f;
+}
+.uniform-score-table .score-col {
+    text-align: right;
+    font-weight: bold;
+    width: 80px; /* Align columns */
+}
+.uniform-score-table tr.winner-row td {
+    /* Keep the gold pulse for the winner */
+    background-color: #fffbe6; 
+    color: #997000; 
+    font-weight: bold; 
+    animation: pulse-gold 2s infinite ease-in-out; 
+}
+@keyframes pulse-gold { 
+    0%, 100% { background-color: #fffbe6; } 
+    50% { background-color: #fff5cc; } 
+}
+/* --- *** END New Table Styles *** --- */
+
+
+/* --- *** MODIFICATION: Copied 7oH Final Hand Styles *** --- */
+.final-hands-header {
+    margin-top: 20px;
+    margin-bottom: 10px;
+    color: #4a2c2a; /* --dark-text */
+    border-top: 1px solid #8c5b4f; /* --teak-light */
+    padding-top: 15px;
+    text-align: left;
+}
+#round-over-hands {
+    max-height: 25vh;
+    overflow-y: auto;
+    background-color: rgba(0,0,0,0.1); /* Darker stripe */
+    border-radius: 5px;
+    padding: 10px;
+}
+#round-over-hands .player-hand-display {
+    margin-bottom: 10px;
+    padding-bottom: 5px;
+    border-bottom: 1px dashed #8c5b4f; /* --teak-light */
+    text-align: left;
+}
+#round-over-hands .player-hand-display:last-child {
+    border-bottom: none;
+}
+#round-over-hands .player-hand-name {
+    font-weight: bold;
+    margin-bottom: 5px;
+    font-size: 1.1em;
+}
+#round-over-hands .player-hand-cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+}
+/* This is the EXISTING .final-card-img style from UNO, slightly adapted */
+.final-card-img {
+    width: 40px;
+    height: 60px; /* 1.5 ratio */
+    border: 1px solid #333;
+    border-radius: 4px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    color: white;
+    text-shadow: 1px 1px 1px black;
+    font-size: 16px;
+    overflow: hidden;
+    user-select: none;
+    background-color: #333; /* Fallback */
+}
+.final-card-img .number-circle {
+    background-color: white;
+    color: black;
+    border-radius: 50%;
+    border: 1px solid #333;
+    width: 25px;
+    height: 25px;
+    font-size: 14px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-shadow: none;
+}
+.final-card-img .action-text {
+    transform: rotate(-35deg);
+    font-size: 8px;
+    letter-spacing: 0;
+    text-align: center;
+}
+.final-card-img.Red { background-color: #ff5555; }
+.final-card-img.Green { background-color: #55aa55; }
+.final-card-img.Blue { background-color: #5555ff; }
+.final-card-img.Yellow { background-color: #ffaa00; }
+.final-card-img.Black { background-color: #333333; }
+/* --- *** END 7oH Final Hand Styles *** --- */
+
 .modal-content.wide { max-width: 800px; }
-
-/* --- *** MODIFIED: Added styles for larger choice modals *** --- */
-.modal-choice .modal-content {
-  min-width: 500px;
-}
-.modal-choice .modal-content h3 {
-  font-size: 1.8em;
-}
-.modal-choice .modal-content p {
-  font-size: 1.2em;
-}
-.modal-choice .action-options {
-  gap: 20px;
-}
-.modal-choice .action-options button,
-.modal-choice #deal-cards-btn {
-  font-size: 1.1em;
-  padding: 15px 25px;
-}
-/* --- *** END MODIFICATION *** --- */
-
 .modal-buttons-container { display: flex; justify-content: center; gap: 20px; margin-top: 20px; }
 .color-options, .action-options { display: flex; gap: 10px; margin-top: 15px; }
 .color-options { justify-content: center; }
 .action-options { flex-direction: column; }
 .color-btn { width: 60px; height: 60px; border: 2px solid #333; border-radius: 5px; cursor: pointer; }
 .color-btn[data-color="Red"] { background-color: #ff5555; } .color-btn[data-color="Green"] { background-color: #55aa55; } .color-btn[data-color="Blue"] { background-color: #5555ff; } .color-btn[data-color="Yellow"] { background-color: #ffaa00; }
-#final-scores { margin: 20px auto; padding: 20px; border: 1px solid #333; background-color: white; max-width: 600px; text-align: center; }
+
 #uno-announcement-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); display: flex; justify-content: center; align-items: center; z-index: 200; opacity: 0; pointer-events: none; transition: opacity 0.5s ease-in-out; }
 #uno-announcement-text { font-size: 15vw; font-weight: bold; color: #ffc107; text-shadow: 5px 5px 10px black; transform: scale(0.5); transition: transform 0.5s ease-in-out; }
 #uno-announcement-overlay.show { opacity: 1; pointer-events: all; }
 #uno-announcement-overlay.show #uno-announcement-text { transform: scale(1); }
-.score-table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 0.9em; color: #333; background-color: white; border-radius: 5px; }
-.score-table th, .score-table td { border: 1px solid #ddd; padding: 8px; text-align: center; }
-.score-table th { background-color: #f2f2f2; color: #333; }
-.final-table th { background-color: #4a4a4a; color: white; }
-.final-table tfoot td { background-color: #f2f2f2; font-weight: bold; border-top: 3px solid #333; }
-.score-table .did-not-play { color: #999; font-style: italic; }
-.score-table tr.winner-row td { background-color: #fffbe6; color: #997000; font-weight: bold; animation: pulse-gold 2s infinite ease-in-out; }
-@keyframes pulse-gold { 0%, 100% { background-color: #fffbe6; box-shadow: 0 0 5px #ffc107; } 50% { background-color: #fff5cc; box-shadow: 0 0 15px #ffc107; } }
+
+/* --- *** REMOVED: Old .score-table, .final-table, .winner-row styles *** --- */
+
 .player-area.has-uno { animation: flashing-red-border 1.5s infinite ease-in-out; }
 .player-area.uno-unsafe { border-color: #ff5555 !important; background-color: rgba(255, 85, 85, 0.1); }
 .player-area.uno-declared { border-color: #00ff00 !important; box-shadow: 0 0 15px #00ff00; }
@@ -174,11 +359,59 @@ body {
 .flying-card { position: absolute; z-index: 300; transition: transform 0.8s ease-in-out, top 0.8s ease-in-out, left 0.8s ease-in-out; }
 /* REMOVED: #game-log-container and #game-log-list styles */
 #drawn-wild-card-name { font-size: 1.4em; font-weight: bold; color: #ffc107; text-shadow: 1px 1px 2px black; margin: 10px 0; text-transform: uppercase; }
-.modal-buttons-container button, #next-round-ok-btn, .lobby-actions button { font-weight: bold; color: #333; border: 2px solid #ccc; background-color: #f0f0f0; transition: all 0.2s ease; padding: 10px 20px; cursor: pointer; }
-.modal-buttons-container button:disabled, #next-round-ok-btn:disabled, .action-buttons button:disabled, .lobby-actions button:disabled { background-color: #999; border-color: #777; color: #eee; cursor: not-allowed; transform: none; box-shadow: none; }
-.modal-buttons-container button:hover, #next-round-ok-btn:hover:not(:disabled), .lobby-actions button:hover:not(:disabled) { transform: scale(1.05); box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
-#next-round-btn, #confirm-end-yes-btn, #final-score-ok-btn, #next-round-ok-btn, #im-back-btn, #discard-pile-ok-btn, #confirm-afk-yes-btn, #discard-wilds-ok-btn, #game-log-ok-btn { background-color: #55aa55; border-color: #448844; color: white; } /* Added #game-log-ok-btn */
-#end-game-round-btn, #confirm-end-no-btn, #confirm-afk-no-btn, #confirm-reset-no-btn { background-color: #ff5555; border-color: #cc4444; color: white; }
+
+/* --- *** MODIFICATION: Updated button styles *** --- */
+.modal-buttons-container button, #next-round-ok-btn, .lobby-actions button, button { 
+    font-weight: bold; 
+    color: #333; 
+    border: 2px solid #ccc; 
+    background-color: #f0f0f0; 
+    transition: all 0.2s ease; 
+    padding: 10px 20px; 
+    cursor: pointer; 
+    font-size: 1em; /* Standardize button font size */
+    border-radius: 8px; /* Standardize border radius */
+}
+.modal-buttons-container button:disabled, #next-round-ok-btn:disabled, .action-buttons button:disabled, .lobby-actions button:disabled, button:disabled { 
+    background-color: #999; 
+    border-color: #777; 
+    color: #eee; 
+    cursor: not-allowed; 
+    transform: none; 
+    box-shadow: none; 
+}
+.modal-buttons-container button:hover:not(:disabled), #next-round-ok-btn:hover:not(:disabled), .lobby-actions button:hover:not(:disabled), button:hover:not(:disabled) { 
+    transform: scale(1.05); 
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3); 
+}
+/* Re-apply action button specifics */
+.action-buttons button {
+    padding: 12px 24px;
+    font-size: 18px;
+    width: 100%;
+}
+#drawCardBtn {
+  padding-top: 18px;
+  padding-bottom: 18px;
+}
+#arrangeHandBtn, #showDiscardPileBtn, #show-log-btn { background-color: #6c757d; border-color: #5a6268; color: white; }
+#unoBtn { width: 120px; height: 120px; border-radius: 50%; border-color: #333; border-width: 3px; font-weight: bold; font-size: 32px; box-shadow: 0 0 10px rgba(0,0,0,0.5); color: white; text-shadow: 1px 1px 2px black; }
+/* --- END Button Style Update --- */
+
+/* Specific Modal Button Colors */
+#next-round-btn, #confirm-end-yes-btn, #final-score-ok-btn, #next-round-ok-btn, #im-back-btn, #discard-pile-ok-btn, #confirm-afk-yes-btn, #discard-wilds-ok-btn, #game-log-ok-btn { 
+    background-color: #55aa55; border-color: #448844; color: white; 
+}
+#end-game-round-btn, #confirm-end-no-btn, #confirm-afk-no-btn, #confirm-reset-no-btn { 
+    background-color: #ff5555; border-color: #cc4444; color: white; 
+}
+.danger-btn, #confirm-reset-yes-btn {
+    background-color: #cc4444; border-color: #aa2222; color: white;
+}
+.danger-btn:hover, #confirm-reset-yes-btn:hover {
+    background-color: #aa2222; border-color: #880000;
+}
+/* --- END Button Color --- */
 
 /* --- MODIFIED: Standardized Toast --- */
 #toast-notification {
@@ -246,6 +479,16 @@ body {
     #toast-notification { padding: 12px 20px; font-size: 1.2em; bottom: 180px; max-width: 90%; white-space: normal; }
 
     #direction-arrow { height: 150px; width: 40px; }
+
+    /* --- MODIFICATION: Mobile modal styles --- */
+    .modal-content {
+        max-width: 95%;
+        width: 95%;
+        max-height: 80vh;
+    }
+    #discard-wilds-modal .modal-content.wide {
+        max-width: 95%;
+    }
 }
 #discard-wilds-results { display: flex; flex-direction: column; gap: 15px; max-height: 50vh; overflow-y: auto; padding: 10px; background-color: rgba(0,0,0,0.2); border-radius: 5px; text-align: left; }
 .discard-result-player { border-bottom: 1px solid #555; padding-bottom: 10px; }
@@ -256,85 +499,6 @@ body {
 .discard-result-cards .card .number-circle { width: 35px; height: 35px; }
 .discard-result-cards .card .action-text { font-size: 14px; }
 .discard-wilds-empty-msg { text-align: center; width: 100%; color: #ffc107; font-style: italic; }
-
-/* --- *** NEW: Final Hands Display (in Scoreboard) *** --- */
-.final-hands-header {
-    margin-top: 20px;
-    margin-bottom: 10px;
-    color: #ffc107;
-    border-top: 1px solid #ffc107;
-    padding-top: 15px;
-    text-align: left;
-}
-#round-over-hands {
-    max-height: 25vh;
-    overflow-y: auto;
-    background-color: rgba(0,0,0,0.2);
-    border-radius: 5px;
-    padding: 10px;
-}
-#round-over-hands .player-hand-display {
-    margin-bottom: 10px;
-    padding-bottom: 5px;
-    border-bottom: 1px dashed #555;
-    text-align: left;
-}
-#round-over-hands .player-hand-display:last-child {
-    border-bottom: none;
-}
-#round-over-hands .player-hand-name {
-    font-weight: bold;
-    margin-bottom: 5px;
-    font-size: 1.1em;
-}
-#round-over-hands .player-hand-cards {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 3px;
-}
-/* This is a new class for the small card images */
-.final-card-img {
-    width: 40px;
-    height: 60px; /* 1.5 ratio */
-    border: 1px solid #333;
-    border-radius: 4px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-weight: bold;
-    color: white;
-    text-shadow: 1px 1px 1px black;
-    font-size: 16px;
-    overflow: hidden;
-    user-select: none;
-    background-color: #333; /* Fallback */
-}
-.final-card-img .number-circle {
-    background-color: white;
-    color: black;
-    border-radius: 50%;
-    border: 1px solid #333;
-    width: 25px;
-    height: 25px;
-    font-size: 14px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    text-shadow: none;
-}
-.final-card-img .action-text {
-    transform: rotate(-35deg);
-    font-size: 8px;
-    letter-spacing: 0;
-    text-align: center;
-}
-.final-card-img.Red { background-color: #ff5555; }
-.final-card-img.Green { background-color: #55aa55; }
-.final-card-img.Blue { background-color: #5555ff; }
-.final-card-img.Yellow { background-color: #ffaa00; }
-.final-card-img.Black { background-color: #333333; }
-/* --- *** END NEW *** --- */
-
 
 /* --- *** NEW: Winner "Rain" Animation (Replaces Confetti/Fireworks) *** --- */
 .fullscreen-overlay {
@@ -424,7 +588,7 @@ body {
 
 /* --- *** NEW: Style for wait message *** --- */
 #lobby-wait-message {
-    color: #ccc; /* Lighter text color */
+    color: #4a2c2a; /* --dark-text */
     font-size: 0.9em;
 }
 /* --- END --- */

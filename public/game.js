@@ -238,12 +238,16 @@ window.addEventListener('DOMContentLoaded', () => {
             const scoresDisplay = document.getElementById('scores-display'); 
             scoresDisplay.innerHTML = '<h3>Round Scores</h3>'; 
             const scoreTable = document.createElement('table'); 
-            scoreTable.className = 'score-table'; 
-            let tableHTML = '<thead><tr><th>Player</th><th>Hand Score</th><th>Total Score</th></tr></thead><tbody>'; 
+            
+            // --- *** MODIFICATION: Apply new uniform class *** ---
+            scoreTable.className = 'uniform-score-table'; 
+            // --- *** END MODIFICATION *** ---
+            
+            let tableHTML = '<thead><tr><th>Player</th><th class="score-col">Hand Score</th><th class="score-col">Total Score</th></tr></thead><tbody>'; 
             finalGameState.players.sort((a,b) => a.score - b.score).forEach(p => { 
                 const roundScoreForPlayer = p.scoresByRound[p.scoresByRound.length - 1]; 
                 const isWinner = winnerName.includes(p.name); 
-                tableHTML += `<tr class="${isWinner ? 'winner-row' : ''}"><td>${p.name}</td><td>${roundScoreForPlayer}</td><td>${p.score}</td></tr>`; 
+                tableHTML += `<tr class="${isWinner ? 'winner-row' : ''}"><td>${p.name}</td><td class="score-col">${roundScoreForPlayer}</td><td class="score-col">${p.score}</td></tr>`; 
             }); 
             tableHTML += '</tbody>'; 
             scoreTable.innerHTML = tableHTML; 
@@ -295,7 +299,45 @@ window.addEventListener('DOMContentLoaded', () => {
     function animateHandSwap(p1_id, p2_id) { /* ... (unchanged) ... */ const p1_area = document.querySelector(`[data-player-id="${p1_id}"]`); const p2_area = document.querySelector(`[data-player-id="${p2_id}"]`); if (!p1_area || !p2_area) return; const p1_cards = p1_area.querySelectorAll('.card-container .card'); const p2_cards = p2_area.querySelectorAll('.card-container .card'); const boardRect = gameBoard.getBoundingClientRect(); const animateHand = (cards, toArea) => { const endRect = toArea.querySelector('.card-container').getBoundingClientRect(); const clones = []; cards.forEach(card => { const startRect = card.getBoundingClientRect(); const clone = card.cloneNode(true); clone.classList.add('flying-card'); clone.style.top = `${startRect.top - boardRect.top}px`; clone.style.left = `${startRect.left - boardRect.left}px`; gameBoard.appendChild(clone); clones.push(clone); card.style.visibility = 'hidden'; }); clones.forEach((clone, i) => { setTimeout(() => { requestAnimationFrame(() => { const top = `${endRect.top - boardRect.top + 10}px`; const left = `${endRect.left - boardRect.left + (i * 20)}px`; clone.style.top = top; clone.style.left = left; }); }, i * 50); setTimeout(() => clone.remove(), 800 + (i*50)); }); }; animateHand(p1_cards, p2_area); animateHand(p2_cards, p1_area); }
     
     function renderGameLog(logHistory) { /* ... (unchanged, still populates modal) ... */ if (!gameLogModalContent) return; gameLogModalContent.innerHTML = ''; if (!logHistory) return; logHistory.forEach(msg => { const entryDiv = document.createElement('div'); entryDiv.textContent = msg; gameLogModalContent.appendChild(entryDiv); }); gameLogModalContent.scrollTop = 0; }
-    function renderFinalScores(finalGameState) { /* ... (unchanged) ... */ const players = finalGameState.players; const numRounds = finalGameState.roundNumber; const table = document.createElement('table'); table.className = 'score-table final-table'; let headerHtml = '<thead><tr><th>Round</th>'; players.forEach(p => { headerHtml += `<th>${p.name}</th>`; }); headerHtml += '</tr></thead>'; let bodyHtml = '<tbody>'; for (let i = 0; i < numRounds; i++) { bodyHtml += `<tr><td>${i + 1}</td>`; players.forEach(p => { const score = p.scoresByRound[i] !== undefined ? p.scoresByRound[i] : '-'; bodyHtml += `<td>${score}</td>`; }); bodyHtml += '</tr>'; } bodyHtml += '</tbody>'; let footerHtml = '<tfoot><tr><td><strong>Total</strong></td>'; let lowestScore = Infinity; players.forEach(p => { if (p.status === 'Active' || p.status === 'Disconnected') { if (p.score < lowestScore) { lowestScore = p.score; } } footerHtml += `<td><strong>${p.score}</strong></td>`; }); footerHtml += '</tr></tfoot>'; table.innerHTML = headerHtml + bodyHtml + footerHtml; finalScoreTableContainer.innerHTML = ''; finalScoreTableContainer.appendChild(table); const winners = players.filter(p => (p.status === 'Active' || p.status === 'Disconnected') && p.score === lowestScore); const winnerNames = winners.map(w => w.name).join(' and '); finalWinnerMessage.textContent = `${winnerNames} win(s) the game!`; }
+    
+    function renderFinalScores(finalGameState) { 
+        const players = finalGameState.players; 
+        const numRounds = finalGameState.roundNumber; 
+        const table = document.createElement('table'); 
+        
+        // --- *** MODIFICATION: Apply new uniform class *** ---
+        table.className = 'uniform-score-table'; 
+        // --- *** END MODIFICATION *** ---
+
+        let headerHtml = '<thead><tr><th>Round</th>'; 
+        players.forEach(p => { headerHtml += `<th>${p.name}</th>`; }); 
+        headerHtml += '</tr></thead>'; 
+        let bodyHtml = '<tbody>'; 
+        for (let i = 0; i < numRounds; i++) { 
+            bodyHtml += `<tr><td>${i + 1}</td>`; 
+            players.forEach(p => { 
+                const score = p.scoresByRound[i] !== undefined ? p.scoresByRound[i] : '-'; 
+                bodyHtml += `<td class="score-col">${score}</td>`; 
+            }); 
+            bodyHtml += '</tr>'; 
+        } 
+        bodyHtml += '</tbody>'; 
+        let footerHtml = '<tfoot><tr><td><strong>Total</strong></td>'; 
+        let lowestScore = Infinity; 
+        players.forEach(p => { 
+            if (p.status === 'Active' || p.status === 'Disconnected') { 
+                if (p.score < lowestScore) { lowestScore = p.score; } 
+            } 
+            footerHtml += `<td class="score-col"><strong>${p.score}</strong></td>`; 
+        }); 
+        footerHtml += '</tr></tfoot>'; 
+        table.innerHTML = headerHtml + bodyHtml + footerHtml; 
+        finalScoreTableContainer.innerHTML = ''; 
+        finalScoreTableContainer.appendChild(table); 
+        const winners = players.filter(p => (p.status === 'Active' || p.status === 'Disconnected') && p.score === lowestScore); 
+        const winnerNames = winners.map(w => w.name).join(' and '); 
+        finalWinnerMessage.textContent = `${winnerNames} win(s) the game!`; 
+    }
     
     function createSmallCardImage(card) { /* ... (unchanged) ... */ const cardDiv = document.createElement('div'); if (!card || !card.color || !card.value) { console.error("Attempted to create small card with invalid data:", card); cardDiv.className = 'final-card-img Black'; cardDiv.textContent = '?'; return cardDiv; } cardDiv.className = `final-card-img ${card.color}`; if (!isNaN(card.value)) { const numberSpan = document.createElement('span'); numberSpan.className = 'number-circle'; numberSpan.textContent = card.value; cardDiv.appendChild(numberSpan); } else { const actionSpan = document.createElement('span'); actionSpan.className = 'action-text'; actionSpan.innerHTML = card.value.replace(/\s/g, '<br>'); cardDiv.appendChild(actionSpan); } return cardDiv; }
     function renderFinalHands(players) { /* ... (unchanged) ... */ const container = document.getElementById('round-over-hands'); if (!container) return; container.innerHTML = ''; if (!players) return; const sortedPlayers = [...players].sort((a,b) => a.score - b.score); sortedPlayers.forEach(player => { if (player.status === 'Removed') return; const hand = player.hand; const handDiv = document.createElement('div'); handDiv.className = 'player-hand-display'; const nameEl = document.createElement('div'); nameEl.className = 'player-hand-name'; nameEl.textContent = `${player.name}:`; handDiv.appendChild(nameEl); const cardsContainer = document.createElement('div'); cardsContainer.className = 'player-hand-cards'; if (hand && hand.length > 0) { hand.sort((a, b) => { const colorOrder = { 'Black': 0, 'Blue': 1, 'Green': 2, 'Red': 3, 'Yellow': 4 }; const valueOrder = { 'Draw Two': 12, 'Skip': 11, 'Reverse': 10, '9': 9, '8': 8, '7': 7, '6': 6, '5': 5, '4': 4, '3': 3, '2': 2, '1': 1, '0': 0, 'Wild': -1, 'Wild Draw Four': -1, 'Wild Pick Until': -1, 'Wild Swap': -1 }; const colorComparison = colorOrder[a.color] - colorOrder[b.color]; if (colorComparison !== 0) return colorComparison; return valueOrder[b.value] - valueOrder[a.value]; }); hand.forEach(card => { cardsContainer.appendChild(createSmallCardImage(card)); }); } else { cardsContainer.textContent = '(Empty)'; } handDiv.appendChild(cardsContainer); container.appendChild(handDiv); }); }
