@@ -115,7 +115,7 @@ body {
 
 #unoBtn { width: 120px; height: 120px; border-radius: 50%; border-color: #333; border-width: 3px; font-weight: bold; font-size: 32px; box-shadow: 0 0 10px rgba(0,0,0,0.5); color: white; text-shadow: 1px 1px 2px black; transition: all 0.3s ease; }
 
-/* --- *** MODIFICATION: New 7oH Modal Styles *** --- */
+/* --- *** MODIFICATION: Styles for Parchment Modals (Scoreboards) *** --- */
 .modal {
     position: fixed;
     z-index: 100;
@@ -126,54 +126,38 @@ body {
     background-color: rgba(0,0,0,0.6);
     display: flex;
     justify-content: center;
-    align-items: center; /* Center vertically */
+    align-items: center;
     pointer-events: none;
 }
 .modal-content {
+    background-color: rgba(40, 40, 40, 0.95); /* Default dark style */
+    color: white;
+    border: 2px solid #ffc107;
+    box-shadow: 0 0 30px rgba(255, 193, 7, 0.5);
+    padding: 20px;
+    border-radius: 10px;
+    text-align: center;
+    max-width: 90%;
+    width: auto;
+    pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+    max-height: 80vh;
+}
+/* Apply parchment style ONLY to score modals */
+#end-of-round-div .modal-content,
+#final-score-modal .modal-content {
     background-color: #D2B48C; /* --parchment-bg */
     color: #4a2c2a; /* --dark-text */
     border: 5px solid #8c5b4f; /* --teak-light */
     box-shadow: 0 5px 20px rgba(0,0,0,0.5);
-    padding: 20px;
     border-radius: 15px;
-    text-align: center;
-    max-width: 90%;
-    width: auto; /* Auto width */
     max-width: 600px; /* Max width for score tables */
-    pointer-events: auto;
-    display: flex;
-    flex-direction: column;
-    max-height: 80vh; /* Allow modal to scroll */
 }
-/* Specific modals from UNO that use the dark style */
-#color-picker-modal .modal-content,
-#pick-until-modal .modal-content,
-#swap-modal .modal-content,
-#drawn-wild-modal .modal-content,
-#deal-choice-modal .modal-content,
-#confirm-end-game-modal .modal-content,
-#confirm-hard-reset-modal .modal-content,
-#afk-notification-modal .modal-content,
-#discard-pile-modal .modal-content,
-#confirm-afk-modal .modal-content,
-#discard-wilds-modal .modal-content,
-#game-log-modal .modal-content {
-    background-color: rgba(40, 40, 40, 0.95);
-    color: white;
-    border: 2px solid #ffc107;
-    box-shadow: 0 0 30px rgba(255, 193, 7, 0.5);
-    max-width: 90%;
-    width: auto; /* Reset width for non-scoreboard modals */
-}
-#discard-wilds-modal .modal-content.wide {
-    max-width: 800px;
-}
-/* Ensure headers are draggable */
-.modal-content h3, .modal-content h2, .modal-content p {
-    cursor: move;
-    user-select: none;
-}
-/* Headers in dark modals */
+#discard-wilds-modal .modal-content.wide { max-width: 800px; } /* Keep wide style */
+/* Headers */
+.modal-content h3, .modal-content h2, .modal-content p { cursor: move; user-select: none; }
+/* Dark modal headers */
 #color-picker-modal .modal-content h3,
 #pick-until-modal .modal-content h3,
 #swap-modal .modal-content h3,
@@ -184,14 +168,15 @@ body {
 #discard-pile-modal .modal-content h3,
 #confirm-afk-modal .modal-content h3,
 #discard-wilds-modal .modal-content h3,
-#game-log-modal .modal-content h3 {
+#game-log-modal .modal-content h3,
+#confirm-hard-reset-modal .modal-content h3 { /* Added hard reset */
     color: #ffc107;
     text-shadow: 1px 1px 2px black;
 }
-/* Headers in new parchment modals (scoreboards) */
+/* Parchment modal headers */
 #end-of-round-div .modal-content h2,
 #final-score-modal .modal-content h2 {
-    color: #4a2c2a; /* --dark-text */
+    color: #4a2c2a;
     text-shadow: none;
     margin-top: 0;
 }
@@ -200,9 +185,9 @@ body {
     padding: 15px 5px 15px 0;
     margin-top: 10px;
     margin-bottom: 10px;
-    min-height: 100px;
+    min-height: 100px; /* Ensure minimum height */
 }
-/* --- *** END New Modal Styles *** --- */
+/* --- *** END Modal Style Update *** --- */
 
 
 /* --- *** MODIFICATION: New Uniform Score Table Styles *** --- */
@@ -238,7 +223,6 @@ body {
     width: 80px; /* Align columns */
 }
 .uniform-score-table tr.winner-row td {
-    /* Keep the gold pulse for the winner */
     background-color: #fffbe6;
     color: #997000;
     font-weight: bold;
@@ -248,12 +232,10 @@ body {
     0%, 100% { background-color: #fffbe6; }
     50% { background-color: #fff5cc; }
 }
-/* --- *** NEW: Right-align round numbers *** --- */
-.uniform-score-table tbody tr td:first-child {
+.uniform-score-table tbody tr td:first-child { /* Right-align round numbers */
     text-align: right;
-    padding-right: 15px; /* Add some padding */
+    padding-right: 15px;
 }
-/* --- *** END NEW *** --- */
 /* --- *** END New Table Styles *** --- */
 
 
@@ -292,7 +274,6 @@ body {
     flex-wrap: wrap;
     gap: 3px;
 }
-/* This is the EXISTING .final-card-img style from UNO, slightly adapted */
 .final-card-img {
     width: 40px;
     height: 60px; /* 1.5 ratio */
@@ -366,53 +347,44 @@ body {
 /* REMOVED: #game-log-container and #game-log-list styles */
 #drawn-wild-card-name { font-size: 1.4em; font-weight: bold; color: #ffc107; text-shadow: 1px 1px 2px black; margin: 10px 0; text-transform: uppercase; }
 
-/* --- *** MODIFICATION: Updated button styles *** --- */
-.modal-buttons-container button, #next-round-ok-btn, .lobby-actions button, button {
+/* --- *** REVERTED: General button styles restored *** --- */
+.modal-buttons-container button, #next-round-ok-btn, .lobby-actions button {
     font-weight: bold;
-    color: #4a2c2a; /* --dark-text */
-    border: 2px solid #8c5b4f; /* --teak-light */
-    background-color: #f5f5dc; /* --light-text */
+    color: #333;
+    border: 2px solid #ccc;
+    background-color: #f0f0f0;
     transition: all 0.2s ease;
     padding: 10px 20px;
     cursor: pointer;
-    font-size: 1em; /* Standardize button font size */
-    border-radius: 8px; /* Standardize border radius */
+    border-radius: 8px; /* Keep consistent radius */
 }
-/* Dark modal buttons need adjustments */
-#color-picker-modal .modal-content button,
-#pick-until-modal .modal-content button,
-#swap-modal .modal-content button,
-#drawn-wild-modal .modal-content button,
-#deal-choice-modal .modal-content button,
-#confirm-end-game-modal .modal-content button,
-#confirm-hard-reset-modal .modal-content button,
-#afk-notification-modal .modal-content button,
-#discard-pile-modal .modal-content button,
-#confirm-afk-modal .modal-content button,
-#discard-wilds-modal .modal-content button,
-#game-log-modal .modal-content button {
-    color: #333; /* Use default text color for dark modals */
-    border: 2px solid #ccc;
-    background-color: #f0f0f0;
-}
-
-.modal-buttons-container button:disabled, #next-round-ok-btn:disabled, .action-buttons button:disabled, .lobby-actions button:disabled, button:disabled {
+.modal-buttons-container button:disabled, #next-round-ok-btn:disabled, .action-buttons button:disabled, .lobby-actions button:disabled {
     background-color: #999;
     border-color: #777;
     color: #eee;
     cursor: not-allowed;
     transform: none;
     box-shadow: none;
-    opacity: 0.7; /* Added opacity for disabled */
+    opacity: 0.7;
 }
-.modal-buttons-container button:hover:not(:disabled), #next-round-ok-btn:hover:not(:disabled), .lobby-actions button:hover:not(:disabled), button:hover:not(:disabled) {
+.modal-buttons-container button:hover:not(:disabled), #next-round-ok-btn:hover:not(:disabled), .lobby-actions button:hover:not(:disabled) {
     transform: scale(1.05);
     box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-    background-color: #daa520; /* --gold-accent */
-    color: #4a2c2a; /* --dark-text */
-    border-color: #daa520; /* --gold-accent */
 }
-/* Re-apply action button specifics */
+/* Restore original button colors */
+#next-round-btn, #confirm-end-yes-btn, #final-score-ok-btn, #next-round-ok-btn, #im-back-btn, #discard-pile-ok-btn, #confirm-afk-yes-btn, #discard-wilds-ok-btn, #game-log-ok-btn {
+    background-color: #55aa55; border-color: #448844; color: white;
+}
+#end-game-round-btn, #confirm-end-no-btn, #confirm-afk-no-btn, #confirm-reset-no-btn {
+    background-color: #ff5555; border-color: #cc4444; color: white;
+}
+.danger-btn, #confirm-reset-yes-btn {
+    background-color: #cc4444; border-color: #aa2222; color: white;
+}
+.danger-btn:hover, #confirm-reset-yes-btn:hover {
+    background-color: #aa2222; border-color: #880000;
+}
+/* Ensure action buttons keep their style */
 .action-buttons button {
     padding: 12px 24px;
     font-size: 18px;
@@ -423,35 +395,11 @@ body {
   padding-bottom: 18px;
 }
 #arrangeHandBtn, #showDiscardPileBtn, #show-log-btn { background-color: #6c757d; border-color: #5a6268; color: white; }
-#arrangeHandBtn:hover:not(:disabled), #showDiscardPileBtn:hover:not(:disabled), #show-log-btn:hover:not(:disabled) {
-    background-color: #5a6268; border-color: #545b62; color: white; /* Maintain dark style */
-}
 #unoBtn { width: 120px; height: 120px; border-radius: 50%; border-color: #333; border-width: 3px; font-weight: bold; font-size: 32px; box-shadow: 0 0 10px rgba(0,0,0,0.5); color: white; text-shadow: 1px 1px 2px black; }
-/* --- END Button Style Update --- */
+/* --- *** END REVERTED BUTTON STYLES *** --- */
 
-/* Specific Modal Button Colors (Maintain Green/Red distinction) */
-#next-round-btn, #confirm-end-yes-btn, #final-score-ok-btn, #next-round-ok-btn, #im-back-btn, #discard-pile-ok-btn, #confirm-afk-yes-btn, #discard-wilds-ok-btn, #game-log-ok-btn {
-    background-color: #55aa55; border-color: #448844; color: white;
-}
-#next-round-btn:hover:not(:disabled), #confirm-end-yes-btn:hover:not(:disabled), #final-score-ok-btn:hover:not(:disabled), #next-round-ok-btn:hover:not(:disabled), #im-back-btn:hover:not(:disabled), #discard-pile-ok-btn:hover:not(:disabled), #confirm-afk-yes-btn:hover:not(:disabled), #discard-wilds-ok-btn:hover:not(:disabled), #game-log-ok-btn:hover:not(:disabled) {
-    background-color: #448844; border-color: #336633; /* Darker green */
-}
 
-#end-game-round-btn, #confirm-end-no-btn, #confirm-afk-no-btn, #confirm-reset-no-btn {
-    background-color: #ff5555; border-color: #cc4444; color: white;
-}
-#end-game-round-btn:hover:not(:disabled), #confirm-end-no-btn:hover:not(:disabled), #confirm-afk-no-btn:hover:not(:disabled), #confirm-reset-no-btn:hover:not(:disabled) {
-    background-color: #cc4444; border-color: #aa2222; /* Darker red */
-}
-.danger-btn, #confirm-reset-yes-btn {
-    background-color: #cc4444; border-color: #aa2222; color: white;
-}
-.danger-btn:hover:not(:disabled), #confirm-reset-yes-btn:hover:not(:disabled) {
-    background-color: #aa2222; border-color: #880000;
-}
-/* --- END Button Color --- */
-
-/* --- *** MODIFIED: Standardized Toast *** --- */
+/* --- MODIFIED: Standardized Toast --- */
 #toast-notification {
   position: fixed;
   bottom: 150px;
@@ -467,9 +415,7 @@ body {
   opacity: 0;
   transition: all 0.5s ease-in-out;
   pointer-events: none;
-  /* --- *** MODIFICATION: Increased font size *** --- */
-  font-size: 2.5em;
-  /* --- *** END MODIFICATION *** --- */
+  font-size: 2.5em; /* UPDATED SIZE */
   white-space: normal;
   max-width: 90%;
   text-align: center;
@@ -492,7 +438,9 @@ body {
 #direction-arrow svg { display: block; width: 100%; height: 100%; animation: pulse 2s infinite ease-in-out; }
 #direction-arrow svg path { fill: white; transition: fill 0.3s ease; }
 #direction-arrow.reversed { transform: rotate(180deg); }
-@keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.15); } /* MODIFIED: Increased pulse intensity */ }
+/* --- *** MODIFICATION: Removed opacity from pulse animation *** --- */
+@keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.15); } }
+/* --- *** END MODIFICATION *** --- */
 @media (max-width: 768px) {
     body { padding: 5px; padding-bottom: 240px; overflow-y: auto; }
     #game-board { flex-direction: column; padding-top: 40px; height: auto; }
