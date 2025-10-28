@@ -209,11 +209,10 @@ body {
     background-color: #8c5b4f; /* --teak-light */
     color: #f5f5dc; /* --light-text */
 }
-/* --- *** NEW: Right-align player name headers *** --- */
+/* Right-align player name headers */
 .uniform-score-table th:not(:first-child) {
     text-align: right;
 }
-/* --- *** END NEW *** --- */
 .uniform-score-table tbody tr:nth-child(even) {
     background-color: rgba(0,0,0,0.05); /* Subtle stripe */
 }
@@ -446,6 +445,16 @@ body {
     padding: 15px 25px; /* Increased padding */
     font-size: 1.1em; /* Increased font size */
 }
+
+/* --- *** NEW: Drawn Wild Card Modal *** --- */
+#drawn-wild-modal .action-options {
+    gap: 20px; /* Increased gap */
+}
+#drawn-wild-modal .action-options button {
+    padding: 15px 25px; /* Increased padding */
+    font-size: 1.1em; /* Increased font size */
+}
+/* --- *** END NEW *** --- */
 /* --- *** END MODIFICATION *** --- */
 
 
