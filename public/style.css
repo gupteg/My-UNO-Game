@@ -209,6 +209,11 @@ body {
     background-color: #8c5b4f; /* --teak-light */
     color: #f5f5dc; /* --light-text */
 }
+/* --- *** NEW: Right-align player name headers *** --- */
+.uniform-score-table th:not(:first-child) {
+    text-align: right;
+}
+/* --- *** END NEW *** --- */
 .uniform-score-table tbody tr:nth-child(even) {
     background-color: rgba(0,0,0,0.05); /* Subtle stripe */
 }
@@ -399,6 +404,51 @@ body {
 /* --- *** END REVERTED BUTTON STYLES *** --- */
 
 
+/* --- *** MODIFICATION: Specific Modal Layouts *** --- */
+/* B. Deal Cards Modal */
+#deal-choice-modal .modal-content {
+    display: flex;
+    flex-direction: row; /* Change to row */
+    align-items: center; /* Vertically center */
+    justify-content: center; /* Center horizontally */
+    gap: 15px; /* Space between input and button */
+    padding: 30px; /* Add more padding */
+}
+#deal-choice-modal p { /* Hide original paragraph */
+    display: none;
+}
+#deal-cards-input {
+    width: 80px; /* Smaller width */
+    font-size: 2.5em; /* Larger font size */
+    text-align: center;
+    padding: 10px;
+    box-sizing: border-box;
+}
+#deal-cards-btn {
+    padding: 15px 30px; /* Larger padding */
+    font-size: 1.5em; /* Larger font size */
+}
+
+/* C. Wild Swap Modal */
+#swap-modal .action-options {
+    gap: 15px; /* Increased gap */
+}
+#swap-modal .player-swap-btn {
+    padding: 12px 24px; /* Increased padding */
+    font-size: 1.1em; /* Increased font size */
+}
+
+/* D. Wild Pick Until Modal */
+#pick-until-modal .action-options {
+    gap: 20px; /* Increased gap */
+}
+#pick-until-modal .action-options button {
+    padding: 15px 25px; /* Increased padding */
+    font-size: 1.1em; /* Increased font size */
+}
+/* --- *** END MODIFICATION *** --- */
+
+
 /* --- MODIFIED: Standardized Toast --- */
 #toast-notification {
   position: fixed;
@@ -476,6 +526,19 @@ body {
     }
     #discard-wilds-modal .modal-content.wide {
         max-width: 95%;
+    }
+    /* --- MODIFICATION: Mobile Deal Cards Modal --- */
+    #deal-choice-modal .modal-content {
+        flex-direction: column; /* Stack on mobile */
+        gap: 10px;
+    }
+    #deal-cards-input {
+        width: 100px; /* Wider on mobile */
+        font-size: 2em; /* Slightly smaller */
+    }
+    #deal-cards-btn {
+        padding: 10px 20px;
+        font-size: 1.2em;
     }
 }
 #discard-wilds-results { display: flex; flex-direction: column; gap: 15px; max-height: 50vh; overflow-y: auto; padding: 10px; background-color: rgba(0,0,0,0.2); border-radius: 5px; text-align: left; }

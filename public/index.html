@@ -80,6 +80,8 @@
             <button id="next-round-ok-btn" style="display: none;">OK</button>
         </div>
     </div>
+
+
     <div id="color-picker-modal" class="modal" style="display: none;"><div class="modal-content"><h3>Choose the next color:</h3><div class="color-options"><button class="color-btn" data-color="Red"></button><button class="color-btn" data-color="Green"></button><button class="color-btn" data-color="Blue"></button><button class="color-btn" data-color="Yellow"></button></div></div></div>
     <div id="pick-until-modal" class="modal modal-choice" style="display: none;"><div class="modal-content"><h3>Choose an action for Wild Pick Until:</h3><div class="action-options"><button id="option-pick-color">Next player picks until color</button><button id="option-discard-wilds">All players discard Wilds</button></div></div></div>
     <div id="swap-modal" class="modal modal-choice" style="display: none;"><div id="swap-modal-content" class="modal-content"><h3>Choose a player to swap hands with:</h3><div id="swap-player-options" class="action-options"></div></div></div>
@@ -95,8 +97,13 @@
         </div>
     </div>
 
-    <div id="deal-choice-modal" class="modal modal-choice" style="display: none;"><div class="modal-content"><h3>You are the dealer!</h3><p>Choose how many cards to deal for this round:</p><input type="number" id="deal-cards-input" value="7" min="1" max="13"><button id="deal-cards-btn">Deal Cards</button></div></div>
-
+    <div id="deal-choice-modal" class="modal modal-choice" style="display: none;">
+        <div class="modal-content">
+            <h3>You are the dealer!</h3>
+            <input type="number" id="deal-cards-input" value="7" min="1" max="13">
+            <button id="deal-cards-btn">Deal Cards</button>
+        </div>
+    </div>
     <div id="confirm-end-game-modal" class="modal" style="display: none;">
         <div class="modal-content">
             <h3>End Game</h3>
@@ -131,6 +138,7 @@
             </div>
         </div>
     </div>
+
     <div id="afk-notification-modal" class="modal" style="display: none;">
         <div class="modal-content">
             <h3>You were marked as AFK!</h3>
