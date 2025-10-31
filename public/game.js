@@ -63,13 +63,13 @@ window.addEventListener('DOMContentLoaded', () => {
     const readyBtn = document.getElementById('ready-btn');
     const playerLobbyActions = document.getElementById('player-lobby-actions');
     const hostLobbyActions = document.getElementById('host-lobby-actions');
-    const hostPasswordInput = document.getElementById('host-password-input');
-
-    // *** NEW HOST CLAIM ELEMENTS ***
+    
+    // --- *** MODIFIED: Removed old password input, added new ones *** ---
+    // const hostPasswordInput = document.getElementById('host-password-input'); // This is removed from host-controls
     const claimHostSection = document.getElementById('claim-host-section');
-    const claimHostPasswordInput = document.getElementById('claim-host-password-input');
+    const claimHostPasswordInput = document.getElementById('claim-host-password-input'); // This ID must match index.html
     const claimHostBtn = document.getElementById('claim-host-btn');
-    // *** END NEW HOST CLAIM ELEMENTS ***
+    // --- *** END MODIFICATION *** ---
 
     const hardResetBtn = document.getElementById('hard-reset-btn');
     const confirmHardResetModal = document.getElementById('confirm-hard-reset-modal');
@@ -110,7 +110,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     // *** NEW EVENT LISTENER ***
     claimHostBtn.addEventListener('click', () => {
-        const password = claimHostPasswordInput.value;
+        const password = claimHostPasswordInput.value; // This was the line causing the error
         socket.emit('claimHost', { password: password });
     });
     // *** END NEW LISTENER ***
@@ -154,7 +154,7 @@ window.addEventListener('DOMContentLoaded', () => {
     drawnWildModal.addEventListener('click', (event) => { const cardIndex = parseInt(drawnWildModal.dataset.cardIndex); if (event.target.id === 'option-play-wild') { socket.emit('choosePlayDrawnWild', { play: true, cardIndex }); } else if (event.target.id === 'option-keep-wild') { socket.emit('choosePlayDrawnWild', { play: false, cardIndex }); } drawnWildModal.style.display = 'none'; });
     pickUntilModal.addEventListener('click', (event) => { let choice = null; if (event.target.id === 'option-pick-color') { choice = 'pick-color'; } else if (event.target.id === 'option-discard-wilds') { choice = 'discard-wilds'; } if (choice) { socket.emit('pickUntilChoice', { choice }); } pickUntilModal.style.display = 'none'; });
     swapModal.addEventListener('click', (event) => { if (event.target.matches('.player-swap-btn')) { const targetPlayerId = event.target.dataset.playerId; socket.emit('swapHandsChoice', { targetPlayerId }); swapModal.style.display = 'none'; } });
-    arrangeHandBtn.addEventListener('click', () => { const myPlayer = window.gameState?.players.find(p => p.playerId === myPersistentPlayerId); if (!myPlayer) return; const colorOrder = { 'Black': 0, 'Blue': 1, 'Green': 2, 'Red': 3, 'Yellow': 4 }; const valueOrder = { 'Draw Two': 12, 'Skip': 11, 'Reverse': 10, '9': 9, '8': 8, '7': 7, '6': 6, '5': 5, '4': 4, '3': 3, '2': 2, '1': 1, '0': 0, 'Wild': -1, 'Wild Draw Four': -1, 'Wild Pick Until': -1, 'Wild Swap': -1 }; const sortedHand = [...myPlayer.hand].sort((a, b) => { const colorComparison = colorOrder[a.color] - colorOrder[b.color]; if (colorComparison !== 0) { return colorComparison; } return valueOrder[b.value] - valueOrder[a.value]; }); myPlayer.hand = sortedHand; socket.emit('rearrangeHand', { newHand: sortedHand }); displayGame(window.gameState); });
+    arrangeHandBtn.addEventListener('click', () => { const myPlayer = window.gameState?.players.find(p => p.playerId === myPersistentPlayerId); if (!myPlayer) return; const colorOrder = { 'Black': 0, 'Blue': 1, 'Green': 2, 'Red': 3, 'Yellow': 4 }; const valueOrder = { 'Draw Two': 12, 'Skip': 11, 'Reverse': 10, '9': 9, '8': 8, '7': 7, '6': 6, '5': 5, '4': 4, '3': 3, '2': 2, '1': 1, '0': 0, 'Wild': -1, 'Wild Draw Four': -1, 'Wild Pick Until': -1, 'Wild Swap': -1 }; const sortedHand = [...myPlayer.hand].sort((a, b) => { const colorComparison = colorOrder[a.color] - colorOrder[b.color]; if (colorComparison !== 0) { return colorComparison; } return valueOrder[b.value] - valueOrder[a.value]; }); myPlayer.hand = sortedhand; socket.emit('rearrangeHand', { newHand: sortedHand }); displayGame(window.gameState); });
     showDiscardPileBtn.addEventListener('click', () => { if (!window.gameState) return; const lastTenDiscards = window.gameState.discardPile.slice(0, 10); discardPileList.innerHTML = ''; if (lastTenDiscards.length === 0) { discardPileList.innerHTML = '<p>The discard pile is empty.</p>'; } else { lastTenDiscards.forEach(item => { const discardItemDiv = document.createElement('div'); discardItemDiv.className = 'discard-item'; const playerP = document.createElement('p'); playerP.className = 'discard-item-player'; playerP.textContent = `Played by: ${item.playerName}`; if (item.card) { const cardEl = createCardElement(item.card, -1); discardItemDiv.appendChild(cardEl); discardItemDiv.appendChild(playerP); discardPileList.appendChild(discardItemDiv); } else { console.warn("Discard pile item missing card data:", item); } }); } discardPileModal.style.display = 'flex'; });
     discardPileOkBtn.addEventListener('click', () => { discardPileModal.style.display = 'none'; });
     discardWildsOkBtn.addEventListener('click', () => { discardWildsModal.style.display = 'none'; });
