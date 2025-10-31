@@ -64,6 +64,13 @@ window.addEventListener('DOMContentLoaded', () => {
     const playerLobbyActions = document.getElementById('player-lobby-actions');
     const hostLobbyActions = document.getElementById('host-lobby-actions');
     const hostPasswordInput = document.getElementById('host-password-input');
+
+    // *** NEW HOST CLAIM ELEMENTS ***
+    const claimHostSection = document.getElementById('claim-host-section');
+    const claimHostPasswordInput = document.getElementById('claim-host-password-input');
+    const claimHostBtn = document.getElementById('claim-host-btn');
+    // *** END NEW HOST CLAIM ELEMENTS ***
+
     const hardResetBtn = document.getElementById('hard-reset-btn');
     const confirmHardResetModal = document.getElementById('confirm-hard-reset-modal');
     const confirmResetYesBtn = document.getElementById('confirm-reset-yes-btn');
@@ -93,13 +100,20 @@ window.addEventListener('DOMContentLoaded', () => {
     imBackBtn.addEventListener('click', () => { socket.emit('playerIsBack'); afkNotificationModal.style.display = 'none'; });
 
     startGameBtn.addEventListener('click', () => {
-        const password = hostPasswordInput.value;
-        socket.emit('startGame', { password: password });
+        // *** MODIFIED: Password is no longer sent here ***
+        socket.emit('startGame', {});
     });
 
     readyBtn.addEventListener('click', () => {
         socket.emit('setPlayerReady');
     });
+
+    // *** NEW EVENT LISTENER ***
+    claimHostBtn.addEventListener('click', () => {
+        const password = claimHostPasswordInput.value;
+        socket.emit('claimHost', { password: password });
+    });
+    // *** END NEW LISTENER ***
 
     hardResetBtn.addEventListener('click', () => {
         confirmHardResetModal.style.display = 'flex';
@@ -286,8 +300,112 @@ window.addEventListener('DOMContentLoaded', () => {
 
 
     // --- ALL DISPLAY AND HELPER FUNCTIONS ---
-    function renderLobby(currentLobbyPlayers) { /* ... (unchanged) ... */ const me = currentLobbyPlayers.find(p => p.playerId === myPersistentPlayerId); if (!me && sessionStorage.getItem('unoPlayerId')) { showToast("You may have been kicked or the session ended."); sessionStorage.removeItem('unoPlayerId'); sessionStorage.removeItem('unoPlayerName'); myPersistentPlayerId = null; setTimeout(() => { location.reload(); }, 1500); return; } if (!me) { console.error("Could not find player data in lobby."); joinScreen.style.display = 'block'; lobbyScreen.style.display = 'none'; gameBoard.style.display = 'none'; return; } joinScreen.style.display = 'none'; lobbyScreen.style.display = 'block'; gameBoard.style.display = 'none'; endOfRoundDiv.style.display = 'none'; finalScoreModal.style.display = 'none'; playerList.innerHTML = ''; let amIHost = me.isHost; currentLobbyPlayers.forEach(player => { if (!player.active) return; const playerItem = document.createElement('li'); const playerInfoDiv = document.createElement('div'); const statusDiv = document.createElement('div'); const nameSpan = document.createElement('span'); nameSpan.className = 'player-name'; let content = player.name; if (player.isHost) content += ' 👑 (Host)'; if (player.playerId === myPersistentPlayerId) content += ' (You)'; nameSpan.textContent = content; playerInfoDiv.appendChild(nameSpan); const readyStatusSpan = document.createElement('span'); readyStatusSpan.className = 'ready-status'; readyStatusSpan.innerHTML = player.isReady ? '✅ Ready' : '❌ Not Ready'; statusDiv.appendChild(readyStatusSpan); if (amIHost && player.playerId !== myPersistentPlayerId) { const kickBtn = document.createElement('button'); kickBtn.className = 'kick-btn'; kickBtn.textContent = 'Kick'; kickBtn.dataset.playerId = player.playerId; statusDiv.appendChild(kickBtn); } playerItem.appendChild(playerInfoDiv); playerItem.appendChild(statusDiv); playerList.appendChild(playerItem); }); if (amIHost) { playerLobbyActions.style.display = 'none'; hostLobbyActions.style.display = 'flex'; const activePlayers = currentLobbyPlayers.filter(p => p.active); const allReady = activePlayers.every(p => p.isReady); startGameBtn.disabled = !(activePlayers.length >= 2 && allReady); } else { playerLobbyActions.style.display = 'flex'; hostLobbyActions.style.display = 'none'; readyBtn.disabled = me.isReady; readyBtn.textContent = me.isReady ? 'Ready' : 'Set Ready'; } hostMessage.style.display = amIHost ? 'none' : 'block'; }
     
+    // *** MODIFIED: renderLobby function ***
+    function renderLobby(currentLobbyPlayers) {
+        const me = currentLobbyPlayers.find(p => p.playerId === myPersistentPlayerId);
+        if (!me && sessionStorage.getItem('unoPlayerId')) {
+            showToast("You may have been kicked or the session ended.");
+            sessionStorage.removeItem('unoPlayerId');
+            sessionStorage.removeItem('unoPlayerName');
+            myPersistentPlayerId = null;
+            setTimeout(() => { location.reload(); }, 1500);
+            return;
+        }
+        if (!me) {
+            console.error("Could not find player data in lobby.");
+            joinScreen.style.display = 'block';
+            lobbyScreen.style.display = 'none';
+            gameBoard.style.display = 'none';
+            return;
+        }
+
+        joinScreen.style.display = 'none';
+        lobbyScreen.style.display = 'block';
+        gameBoard.style.display = 'none';
+        endOfRoundDiv.style.display = 'none';
+        finalScoreModal.style.display = 'none';
+
+        // Render player list
+        playerList.innerHTML = '';
+        const hostExistsForList = currentLobbyPlayers.some(p => p.isHost); // Check once
+        
+        currentLobbyPlayers.forEach(player => {
+            if (!player.active) return;
+            const playerItem = document.createElement('li');
+            const playerInfoDiv = document.createElement('div');
+            const statusDiv = document.createElement('div');
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'player-name';
+            let content = player.name;
+            if (player.isHost) content += ' 👑 (Host)';
+            if (player.playerId === myPersistentPlayerId) content += ' (You)';
+            nameSpan.textContent = content;
+            playerInfoDiv.appendChild(nameSpan);
+
+            const readyStatusSpan = document.createElement('span');
+            readyStatusSpan.className = 'ready-status';
+            
+            // Show ready status only if a host exists
+            if (hostExistsForList) {
+                 readyStatusSpan.innerHTML = player.isReady ? '✅ Ready' : '❌ Not Ready';
+            } else {
+                 readyStatusSpan.innerHTML = '🔹 Waiting...';
+            }
+            statusDiv.appendChild(readyStatusSpan);
+
+            // Kick button logic (only host can kick, but host can't kick self)
+            if (me.isHost && player.playerId !== myPersistentPlayerId) {
+                const kickBtn = document.createElement('button');
+                kickBtn.className = 'kick-btn';
+                kickBtn.textContent = 'Kick';
+                kickBtn.dataset.playerId = player.playerId;
+                statusDiv.appendChild(kickBtn);
+            }
+            playerItem.appendChild(playerInfoDiv);
+            playerItem.appendChild(statusDiv);
+            playerList.appendChild(playerItem);
+        });
+
+        // --- *** NEW 3-STATE LOBBY UI LOGIC *** ---
+        const host = currentLobbyPlayers.find(p => p.isHost);
+
+        if (!host) {
+            // State 1: No Host Exists
+            playerLobbyActions.style.display = 'none';
+            hostLobbyActions.style.display = 'none';
+            claimHostSection.style.display = 'flex'; // Use flex as per new CSS
+            hostMessage.textContent = 'Waiting for a player to become Host...';
+            hostMessage.style.display = 'block';
+
+        } else if (host && me.isHost) {
+            // State 2: Host Exists, and I am the Host
+            playerLobbyActions.style.display = 'none';
+            hostLobbyActions.style.display = 'flex';
+            claimHostSection.style.display = 'none';
+            hostMessage.style.display = 'none'; // Host doesn't need the wait message
+
+            // Host-specific logic (from original function)
+            const activePlayers = currentLobbyPlayers.filter(p => p.active);
+            const allReady = activePlayers.every(p => p.isReady);
+            startGameBtn.disabled = !(activePlayers.length >= 2 && allReady);
+
+        } else if (host && !me.isHost) {
+            // State 3: Host Exists, and I am NOT the Host
+            playerLobbyActions.style.display = 'flex';
+            hostLobbyActions.style.display = 'none';
+            claimHostSection.style.display = 'none';
+            hostMessage.textContent = 'Waiting for the host to start the game'; // Original message
+            hostMessage.style.display = 'block';
+
+            // Player-specific logic (from original function)
+            readyBtn.disabled = me.isReady;
+            readyBtn.textContent = me.isReady ? 'Ready' : 'Set Ready';
+        }
+        // --- *** END NEW 3-STATE LOBBY UI LOGIC *** ---
+    }
+    // *** END MODIFIED function ***
+
     function showToast(message) { /* ... (unchanged) ... */ if (!toastNotification) return; toastNotification.textContent = message; toastNotification.classList.add('show'); setTimeout(() => { toastNotification.classList.remove('show'); }, 3000); }
     
     function showUnoAnnouncement(message) { /* ... (unchanged) ... */ unoAnnouncementText.textContent = message; if (message.length > 10) { unoAnnouncementText.style.fontSize = '8vw'; } else { unoAnnouncementText.style.fontSize = '15vw'; } unoAnnouncementOverlay.classList.add('show'); setTimeout(() => { unoAnnouncementOverlay.classList.remove('show'); }, 1900); }
