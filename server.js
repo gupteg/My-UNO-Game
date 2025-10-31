@@ -53,7 +53,7 @@ function setupGame(lobbyPlayers) {
     return {
         phase: 'Lobby', // Start phase as Lobby, will change immediately
         players: gamePlayers,
-        dealerIndex: -1,
+        dealerIndex: -1, // Will be set to 0 (the host) in startGame
         numCardsToDeal: 7,
         discardPile: [],
         drawPile: [],
@@ -304,7 +304,8 @@ io.on('connection', (socket) => {
         }
     }
 
-    // New join / Lobby logic (unchanged)
+    // --- *** MODIFIED: New join / Lobby logic *** ---
+    // No one is host on join anymore
     let pId = playerId || Math.random().toString(36).substr(2, 9);
     const existingPlayer = players.find(p => p.playerId === pId);
     if (existingPlayer) {
@@ -312,19 +313,92 @@ io.on('connection', (socket) => {
         existingPlayer.name = playerName;
         existingPlayer.active = true;
     } else {
-        const isHost = players.length === 0;
-        players.push({ playerId: pId, socketId: socket.id, name: playerName, isHost: isHost, isReady: isHost, active: true });
+        // --- *** MODIFIED: No host assignment *** ---
+        const isHost = false; // players.length === 0;
+        const isReady = false; // isHost;
+        players.push({ playerId: pId, socketId: socket.id, name: playerName, isHost: isHost, isReady: isReady, active: true });
+        // --- *** END MODIFICATION *** ---
     }
     // Use the *current* lobby 'players' array here for joinSuccess context
     socket.emit('joinSuccess', { playerId: pId, lobby: players });
     io.emit('lobbyUpdate', players);
   });
-  // *** END MODIFIED Rejoin Logic ***
+  // *** END MODIFIED Rejoin/Join Logic ***
+
+  // --- *** NEW: claimHost Handler *** ---
+  socket.on('claimHost', ({ password }) => {
+    // 1. Check if a host already exists
+    if (players.some(p => p.isHost)) {
+        return socket.emit('announce', 'A host has already been claimed.');
+    }
+
+    // 2. Refined Password Check (uses HOST_PASSWORD from top of file)
+    if (HOST_PASSWORD !== null) {
+        // A password IS required
+        if (password !== HOST_PASSWORD) {
+            return socket.emit('announce', 'Incorrect host password.');
+        }
+        // Password is correct, so proceed...
+    }
+    // If HOST_PASSWORD is null, we skip the check
+    // and the player automatically succeeds.
+
+    // 4. Promote the player
+    const newHost = players.find(p => p.socketId === socket.id);
+    if (!newHost) { return; } // Safety check
+
+    newHost.isHost = true;
+    newHost.isReady = true;
+
+    // 5. Re-order the array
+    // Find the full player object first
+    const newHostPlayerObject = players.find(p => p.playerId === newHost.playerId);
+    // Remove newHost from their current position
+    players = players.filter(p => p.playerId !== newHost.playerId);
+
+    // Add them to the very front (index 0)
+    players.unshift(newHostPlayerObject);
+
+    // 6. Broadcast the new lobby state
+    io.emit('lobbyUpdate', players);
+  });
+  // --- *** END NEW HANDLER *** ---
 
 
   socket.on('setPlayerReady', () => { if (gameState) return; const player = players.find(p => p.socketId === socket.id); if (player && !player.isHost) { player.isReady = !player.isReady; io.emit('lobbyUpdate', players); } });
   socket.on('kickPlayer', ({ playerIdToKick }) => { if (gameState) return; const host = players.find(p => p.socketId === socket.id && p.isHost); if (host) { const playerToKick = players.find(p => p.playerId === playerIdToKick); if (playerToKick) { console.log(`Host ${host.name} kicked ${playerToKick.name}`); players = players.filter(player => player.playerId !== playerIdToKick); io.to(playerToKick.socketId).emit('forceDisconnect'); io.emit('lobbyUpdate', players); } } });
-  socket.on('startGame', ({ password }) => { if (gameState) return; const host = players.find(p => p.socketId === socket.id && p.isHost); if (!host) return; if (HOST_PASSWORD && password !== HOST_PASSWORD) { return socket.emit('announce', 'Incorrect host password.'); } const activePlayers = players.filter(p => p.active); if (activePlayers.length < 2) { return socket.emit('announce', 'Need at least 2 players to start.'); } const allReady = activePlayers.every(p => p.isReady); if (!allReady) { return socket.emit('announce', 'Not all players are ready.'); } gameState = setupGame(activePlayers); const newDealerIndex = (gameState.dealerIndex + 1) % gameState.players.length; gameState.dealerIndex = newDealerIndex; gameState.playerChoosingActionId = gameState.players[newDealerIndex].playerId; gameState.phase = 'Dealing'; players = []; io.emit('updateGameState', gameState); });
+  
+  // --- *** MODIFIED: startGame handler *** ---
+  socket.on('startGame', () => { // Password object removed
+    if (gameState) return; 
+    const host = players.find(p => p.socketId === socket.id && p.isHost); 
+    if (!host) return; 
+
+    // Password check removed - already handled by claimHost
+    
+    const activePlayers = players.filter(p => p.active); 
+    if (activePlayers.length < 2) { 
+        return socket.emit('announce', 'Need at least 2 players to start.'); 
+    } 
+    const allReady = activePlayers.every(p => p.isReady); 
+    if (!allReady) { 
+        return socket.emit('announce', 'Not all players are ready.'); 
+    } 
+    
+    gameState = setupGame(activePlayers); 
+    
+    // --- *** MODIFIED: Host is now always index 0 *** ---
+    const newDealerIndex = 0; // Host is always first player in array
+    gameState.dealerIndex = newDealerIndex; 
+    // --- *** END MODIFICATION *** ---
+
+    gameState.playerChoosingActionId = gameState.players[newDealerIndex].playerId; 
+    gameState.phase = 'Dealing'; 
+    players = []; // Clear lobby array
+    io.emit('updateGameState', gameState); 
+  });
+  // --- *** END MODIFIED startGame *** ---
+
   function checkAndStartNextRound() { if (!gameState || gameState.phase !== 'RoundOver') return; const host = gameState.players.find(p => p.isHost); const connectedPlayers = gameState.players.filter(p => p.status === 'Active'); if (!host) return; const hostIsReady = gameState.readyForNextRound.includes(host.playerId); const allPlayersReady = gameState.readyForNextRound.length === connectedPlayers.length; if (hostIsReady && allPlayersReady) { let newDealerIndex = (gameState.dealerIndex + 1) % gameState.players.length; let maxAttempts = gameState.players.length; while (gameState.players[newDealerIndex].status !== 'Active' && maxAttempts > 0) { addLog(`Dealer ${gameState.players[newDealerIndex].name} is not active. Skipping.`); newDealerIndex = (newDealerIndex + 1) % gameState.players.length; maxAttempts--; } if (gameState.players[newDealerIndex].status !== 'Active') { addLog("Error: No active player found to be the next dealer!"); return; } gameState.dealerIndex = newDealerIndex; const dealer = gameState.players[newDealerIndex]; gameState.playerChoosingActionId = dealer.playerId; gameState.phase = 'Dealing'; io.emit('updateGameState', gameState); } }
   socket.on('playerReadyForNextRound', () => { if (!gameState || gameState.phase !== 'RoundOver') return; const player = gameState.players.find(p => p.socketId === socket.id); if (player && player.status === 'Active' && !gameState.readyForNextRound.includes(player.playerId)) { gameState.readyForNextRound.push(player.playerId); checkAndStartNextRound(); io.emit('updateGameState', gameState); } });
   socket.on('dealChoice', ({ numCards }) => { if (!gameState || gameState.phase !== 'Dealing' || gameState.isPaused) return; const dealingPlayer = gameState.players.find(p => p.socketId === socket.id); if (gameState.playerChoosingActionId === dealingPlayer?.playerId) { const numToDeal = Math.max(1, Math.min(13, parseInt(numCards) || 7)); gameState.numCardsToDeal = numToDeal; gameState.playerChoosingActionId = null; gameState = startNewRound(gameState); io.emit('updateGameState', gameState); } });
@@ -533,27 +607,32 @@ io.on('connection', (socket) => {
 
             io.emit('updateGameState', gameState); // Update everyone with new pause state
         }
-    } else { // Handle lobby disconnect (unchanged from previous)
+    } else { 
+        // --- *** MODIFIED: Handle lobby disconnect (new logic) *** ---
         const playerInLobby = players.find(player => player.socketId === socket.id);
         if (playerInLobby) {
             playerInLobby.active = false;
             let hostLeft = false;
-            if (playerInLobby.isHost && players.some(p => p.active)) {
-                playerInLobby.isHost = false;
-                const nextHost = players.find(p => p.active);
-                if (nextHost) {
-                    nextHost.isHost = true;
-                    nextHost.isReady = true;
-                    hostLeft = true;
-                }
+
+            if (playerInLobby.isHost) {
+                playerInLobby.isHost = false; // Revoke host status
+                hostLeft = true;
+                // Make all other players not-ready, forcing a new host claim
+                players.forEach(p => {
+                    if (p.playerId !== playerInLobby.playerId) {
+                        p.isReady = false;
+                    }
+                });
+                console.log(`Host ${playerInLobby.name} disconnected. Lobby is now hostless.`);
             }
+
             if (!players.some(p => p.active)) {
-                 players = [];
+                 players = []; // Clear lobby if last player leaves
                  console.log("Last active player left lobby. Clearing lobby.");
             }
             io.emit('lobbyUpdate', players);
-            if (hostLeft) console.log(`Host ${playerInLobby.name} disconnected. New host assigned.`);
         }
+        // --- *** END MODIFIED LOBBY DISCONNECT *** ---
     }
   });
 
